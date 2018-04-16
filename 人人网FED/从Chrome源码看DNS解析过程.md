@@ -148,3 +148,93 @@ if (rv != ERR_DNS_CACHE_MISS) {
 ```
 
 即网络发生了变化，或者expired_by大于0，则认为是过时的cache。这个时间差是用当时时间减去当前cache的过期时间：
+
+```c++
+stale.expired_by = now - expires_;
+```
+
+而过期时间是在初始化的时候使用now + ttl的值，而这个ttl（time to live）是使用上一次请求解析的时候返回的ttl：
+
+```c++
+ uint32_t ttl_sec = std::numeric_limits<uint32_t>::max();
+ ttl_sec = std::min(ttl_sec, record.ttl);
+ *ttl = base::TimeDelta::FromSeconds(ttl_sec);
+```
+
+上面的代码做了一个防溢出处理。在wireshark的dns response可以直观看到这个ttl：
+
+![dns response 的ttl](https://user-gold-cdn.xitu.io/2018/1/1/160b1c7bd5cf2849?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+
+
+当前域名的TTL值为600s即10分钟。这个可以在买域名的提供商那里进行设置：
+
+![域名的TTL时间](https://user-gold-cdn.xitu.io/2018/1/1/160b1c7bd698f424?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+在添加解析的时候可以看到，A就是把域名解析到一个IPV4地址，而AAAA是解析到IPV6地址，CNAME是解析到另一个域名。使用CNMAE的好处是当很多域名指向一个CNMAE时，当需要改变IP地址时，只要改变这个CNMAE的地址，那么其他的也跟着生效了，但是得做第二次解析。
+
+如果域名在本地不能解析的话，Chrome就会去发请求了。操作系统提供了一个叫getaddrinfo的系统函数用来做域名解析，但是Chrome并没有使用，而是自己实现了一个DNS客户端，包括封装DNS request报文以及解析DNS response报文。这样可能是因为灵活度会更大一点，例如Chrome可以自行决定怎么用nameservers，顺序以及失败尝试的次数等。
+
+在resolver的startJob里面启动解析。取到下一个queryId，然后构建一个query，再构建一个DnsUDPAttempt，再执行它的start，因为DNS客户端查询使用的是UDP报文（辅域名服务器向主域名服务器查询是用的TCP）：
+
+```c++
+uint16_t id = session_->NextQueryId();
+std::unique_ptr<DnsQuery> query;
+query.reset(new DnsQuery(id, qnames_.front(), qtype_, opt_rdata_));
+
+DnsUDPAttempt* attempt =
+    new DnsUDPAttempt(server_index, std::move(lease), std::move(query));
+int rv = attempt->Start(
+    base::Bind(&DnsTransactionImpl::OnUdpAttemptComplete,
+               base::Unretained(this), attempt_number,
+               base::TimeTicks::Now()));
+```
+
+具体解析过程拆成了几步，这个代码组织是这样的，通过一个state决定执行顺序。
+
+```c++
+int rv = result;
+do {
+  // 最开始的state为STATE_SEND_QUERY
+  State state = next_state_;
+  next_state_ = STATE_NONE;
+  switch (state) {
+    case STATE_SEND_QUERY:
+      rv = DoSendQuery();
+      break;
+    case STATE_SEND_QUERY_COMPLETE:
+      rv = DoSendQueryComplete(rv);
+      break;
+    case STATE_READ_RESPONSE:
+      rv = DoReadResponse();
+      break;
+    case STATE_READ_RESPONSE_COMPLETE:
+      rv = DoReadResponseComplete(rv);
+      break;
+    default:
+      NOTREACHED();
+      break;
+  }
+} while (rv != ERR_IO_PENDING && next_state_ != STATE_NONE);
+```
+
+state从第一个case执行完之后变成第二个case的state，在第二个case的执行函数里面又把它改成第三个，这样依次下来，知道变成while循环里面的STATE_DONE，或者是ERR状态结束当前transaction事务。所以这个代码组织还是比较有趣的。
+
+最后解析成功之后，会把结果放到cache里面：
+
+```c++
+  if (did_complete) {
+      resolver_->CacheResult(key_, entry, ttl);
+      RecordJobHistograms(entry.error());
+    }
+```
+
+然后生成一个addressList，传递给相应的callback，因为DNS解析可能会返回多个结果，如下面这个：
+
+![DNS解析返回多个结果](https://user-gold-cdn.xitu.io/2018/1/1/160b1c7bd6b43cd4?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+这里我们没用Chrome打印结果了，都是直接看的wireshark的输出，因为添加打印函数比较麻烦，直接看wireshark的输出比较直观，节省时间。
+
+本文简单地介绍了DNS解析的过程以及DNS的一些相关概念，相信到这里，可以回答上面提出的几个问题了。总的来说，客户端向域名解析服务器发起了查询，然后服务器响应。DNS服务器nameservers是在设备接入网络的时候路由器通过DHCP发给设备的，Chrome会按照nameservers的顺序发起查询，并将结果缓存，有效时间根据ttl，有效期内两次查询直接使用cache。DNS解析的结果有几种类型，最常见的是A记录和CNMAE记录，A记录表示结果是一个IP地址，CNMAE表示结果是另外一个域名。
+
+本文没有很深入详细地介绍，但是核心的概念和逻辑过程应该是都有涉及了。
