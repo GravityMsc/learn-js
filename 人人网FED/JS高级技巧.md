@@ -76,3 +76,104 @@ Object.prototype.toString.call([1, 2, 3]) === "[object Array]"
 所以可以知道class也是用function实现的原型，也就是说class和function本质上是一样的，只是写法上不一样。
 
 那是不是说不能再使用instanceof判断变量类型了？不是的，当你需要检测父页面的变量类型就得使用这种方法，本页面的变量还是可以使用instanceof或者constructor的方法判断，只要你确保这个变量不会跨页面。因为对于大多数人来说，很少会写iframe的代码，所以没有必要搞一个比较麻烦的方式，还是用简单的方式就好了。
+
+## 2. 惰性载入函数
+
+有时候需要在代码里面做一些兼容性判断，或者是做一些UA的判断，如下代码所示：
+
+```javascript
+// UA的类型
+getUAType: function(){
+    let ua = window.navigator.userAfent;
+    if(ua.match(/renren/i)){
+        return 0;
+    }
+    else if(ua.match(/MicroMessenger/i)){
+        return 1;
+    }
+    else if(ua.match(/weibo/i)){
+        return 2;
+    }
+    return -1;
+}
+```
+
+这个函数的作用是判断用户是在哪个环境打开的网页，以便于统计哪个渠道的效果比较好。
+
+这种类型的判断都有一个特点，就是它的结果是死的，不管执行按断多少次，都会返回相同的结果，例如用户的UA在这个网页不可能会发生变化（除了调试设定的之外）。所以为了优化，才有了惰性战术一说，上面的代码可以改成：
+
+```javascript
+// UA的类型
+getUAType: function(){
+    let ua = window.navigator.userAgent;
+    if(ua.match(/renren/i)){
+        pageData.getUAType = () => 0;
+        return 0;
+    } 
+    else if(ua.match(/MicroMessenger/i)){
+        pageData.getUAType = () => 1;
+        return 1;
+    }
+    else if(ua.match(/weibo/i)){
+        pageData.getUAType = () => 2;
+        return 2;
+    }
+    return -1;
+}
+```
+
+在每次判断之后，把getUAType这个函数重新赋值，变成一个新的function，而这个function直接返回一个确定的变量，这样以后的每次获取都不用再判断了，这就是惰性函数的作用。你可能会说这个几个判断能优化多少时间呢，这么点时间对于用户来说几乎是没有区别的呀。确实如此，但是作为一个有追求的码农，还是会想办法尽可能优化自己的代码，而不是只是为了完成需求完成功能。并且当你的这些优化累积到一个量的时候就会发生质变。我上大学的时候C++的老师举了一个例子，说有个系统比较慢找她去看一下，其中她做的一个优化就是把小数的双精度改成单精度，最后是快了不少。
+
+但其实上面的例子我们有一个更简单的实现，那就是直接搞个变量存起来就好了：
+
+```javascript
+let ua = window.navigator.userAgent;
+let UAType = ua.match(/renren/i) ? 0 :
+				ua.match(/MicroMessenger/i/) ? 1:
+                 ua.match(/weibo/i)? 2 : -1;
+```
+
+连函数都不用写了，缺点是即使没有使用到UAType这个变量，也会执行一次判断，但是我们认为这个变量被用到的概率还是很高的。
+
+我们再举一个比较有用的例子，由于Safari的无痕浏览会禁掉本地存储，因此需要搞一个兼容性判断：
+
+```javascript
+Data.localStorageEnabled = true;
+// Safari的无痕浏览会禁用localStorage
+try{
+    window.localStorage.trySetData = 1;
+} catch(e){
+    Data.localStorageEnabled = false;
+}
+
+setLocalData: function(key, value){
+    if(Data.localStorageEnabled){
+        window.localStorage[key] = value;
+    }
+    else {
+        util.setCookie('_L_' + key, value, 1000);
+    }
+}
+```
+
+在设置本地数据的时候，需要判断一下是不是支持本地存储，如果是的话就一共localStorage，否则改用cookie。可以用惰性函数改造一下：
+
+```javascript
+setLocalData: function(key, value) {
+    if(Data.localStorageEnabled) {
+        util.setLocalData = function(key, value){
+            return window.localStorage[key];
+        }
+    } else {
+        util.setLocalData = function(key, value){
+            return util.getCookie("_L_" + key);
+        }
+    }
+    return util.setLocalData(key, value);
+}
+```
+
+这里可以减少一次if/else的判断，但好像不是特别实惠，毕竟为了减少一次判断，引入了一个惰性函数的概念，所以你可能要权衡一下这种引入是否值得，如果有三五个判断应该还是比较好的。
+
+## 3. 函数绑定
+
