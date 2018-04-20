@@ -177,3 +177,20 @@ setLocalData: function(key, value) {
 
 ## 3. 函数绑定
 
+有时候要把一个函数当参数传递给另一个函数执行，此时函数的执行上下文往往会发生变化，如下代码：
+
+```javascript
+class DrawTool {
+    constructor(){
+        this.points = [];
+    }
+    handlerMouseClick(event){
+        this.points.push(event.latLng);
+    }
+    init(){
+        $map.on('click', this.handleMouseClick);
+    }
+}
+```
+
+click事件的执行回调里面this不是指向了DrawTool的实例了，
