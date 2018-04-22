@@ -193,4 +193,108 @@ class DrawTool {
 }
 ```
 
-click事件的执行回调里面this不是指向了DrawTool的实例了，
+click事件的执行回调里面this不是指向了DrawTool的实例了，所以里面的this.points将会返回undefined。第一种解决方法是使用闭包，先把this缓存一下，编程that：
+
+```javascript
+class DrawTool{
+    constructor(){
+        this.points = [];
+    }
+    handleMouseClick(event){
+        this.points.push((event.latLng));
+    }
+    init(){
+        let that = this;
+        $map.on('click', event => that.handleMouseClick(event));
+    }
+}
+```
+
+由于回调函数是用that执行的，而that是指向DrawTool的实例，因此就没有问题了。相反如果没有that它就用this，那么就要看this指向哪里了。
+
+因为我们用了箭头函数，而箭头函数的this还是指向父级的上下文，因此这里不用自己创建一个闭包，直接用this就可以：
+
+```javascript
+init(){
+    $map.on('click', event => this.handleMouseClick(event));
+}
+```
+
+这种方式更加简单，第二种方法是使用ES5的bind函数绑定，如下代码：
+
+```javascript
+init(){
+    $map.on('click', this.handleMouseClick.bind(this));
+}
+```
+
+这个bind看起来好像很神奇，但其实只要一行代码就可以实现一个bind函数：
+
+```javascript
+Function.prototype.bind = function(context){
+    return () => this.call(context);
+}
+```
+
+就是返回一个函数，这个函数的this是指向的原始函数，然后让它call(context)绑定一下执行上下文就可以了。
+
+## 4. 柯里化
+
+柯里化就是函数和参数值结合产生一个新的函数，如下代码，假设有一个curry的函数：
+
+```javascript
+function add(a, b){
+    return a + b;
+}
+
+let add1 = add.curry(1);
+console.log(add1(5));	// 6
+console.log(add1(2));	// 3
+```
+
+怎么实现这样一个curry的函数？它的重点是要返回一个函数，这个函数有一些闭包的变量记录了创建时的默认参数，然后执行这个返回函数的时候，把新传进来的参数和默认参数拼成完整参数列表去调用原本的函数，所以就有了以下代码：
+
+```javascript
+Function.prototype.curry = function(){
+    let defaultArgs = arguments;
+    let that = this;
+    return function(){
+        return that.apply(this, defaultArgs.concat(arguments));
+    };
+};
+```
+
+但是由于参数不是一个数组，没有concat函数，所以需要把伪数组转成一个数组，可以用Array.prototype.slice:
+
+```javascript
+Function.prototype.curry = function(){
+    let slice = Array.prototype.slice;
+    let defaultArgs = slice.call(arguments);
+    let that = this;
+    return function(){
+        return that.apply(this, defaultArgs.concat(slice.call(arguments)));
+    };
+};
+```
+
+现在举一个柯里化一个有用的例子，当需要把一个数组降序排序的时候，需要这样写：
+
+```javascript
+let data = [1, 5, 2, 3, 10];
+data.sort((a, b) => b - a);	// [10, 5, 3 ,2, 1]
+```
+
+给sort传一个函数的参数，但是如果你的降序操作比较多，每次都写一个函数参数还是有点烦的，因此可以用柯里化把这个参数固化起来：
+
+```javascript
+Array.prototype.sortDescending = Array.prototype.sort.curry((a, b) => b - a);
+```
+
+这样就方便多了：
+
+```javascript
+let data = [1, 5, 2, 3, 10];
+data.sortDescending();
+console.log(data);	// [10, 5, 3, 2, 1]
+```
+
