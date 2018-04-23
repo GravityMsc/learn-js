@@ -322,4 +322,214 @@ console.log(data);	// [10, 5, 3, 2, 1]
 
 （3）defineProperty冻结单个属性
 
-如下图所示，设置enumable/writable为false，那么
+如下图所示，设置enumerable/writable为false，那么这个属性将不可遍历和写：
+
+![冻结单个属性](https://user-gold-cdn.xitu.io/2017/9/3/4e3c2c849bca4a77e2a0a8eba83ceabf?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+## 6. 定时器
+
+怎么实现一个JS版的sleep函数？因为在C/C++/Java等语言是有sleep函数，但是JS没有。sleep函数的作用是让线程进入休眠，当到了指定时间后再重新唤起。你不能写个while循环然后不断地判断当前时间和开始时间的差值是不是到了指定时间了，因为这样会占用CPU，就不是休眠了。
+
+这个实现比较简单，我们可以使用setTimeout + 回调：
+
+```javascript
+function sleep(millionSeconds, callback){
+    setTimeout(callback, millionSeconds);
+}
+
+// sleep 2 秒
+sleep(2000, () => console.log("sleep recover"));
+```
+
+但是使用回调让我的代码不能够和平常的代码一样像瀑布流一样写下来，我得搞一个回调函数当作参数传值。于是想到了Promise，现在用Promise改写一下：
+
+```javascript
+function sleep(millionSeconds){
+    return new Promise(resolve => setTimeout(resolve, millionSeconds));
+}
+sleep(2000).then(() => console.log("sleep recover"));
+```
+
+但好像还是没有办法解决上面的问题，仍然需要传递一个函数参数。
+
+虽然使用Promise本质上是一样的，但是它有一个resolve的参数，方便你告诉它什么时候异步结束，然后它就可以执行then了，特别是在回调比较复杂的时候，使用Promise还是会更加的方便。
+
+ES7新增了两个新的关键字async/await用于处理异步的情况，让异步代码的写法就像同步代码一样，如下async版本的sleep：
+
+```javascript
+function sleep(millionSeconds){
+    return new Promise(resolve => setTimeOut(resolve, millionSeconds));
+}
+
+async function init(){
+    await sleep(2000);
+    console.log("sleep recover");
+}
+
+init();
+```
+
+相对于简单的Promise版本，sleep的实现还是没变。不过在调用sleep的前面加一个await，这样只有sleep这个异步完成了，才会接着执行下面的代码。同时需要把代码逻辑包在一个async标记的函数里面，这个函数会返回一个Promise对象，当里面的异步都执行完了就可以then了：
+
+```javascript
+init().then(() => console.log("init finished"));
+```
+
+ES7的新关键字让我们的代码更加地简洁优雅。
+
+关于定时器还有一个很重要的话题，那就是setTimeout和setInterval的区别。如下图所示。
+
+![setTimeout 和 setInterval的区别](https://user-gold-cdn.xitu.io/2017/9/3/86b8194cd16e39f7512f319d024d0593?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+setTimeout是在当前执行单元都执行完才开始计时，而setInterval是在设定完计时器后就立马计时。可以用一个实际的例子做说明，这个例子我在《[JS与多线程](https://fed.renren.com/2017/05/21/js-threads/)》这篇文章立马提到过，这里用代码实际地运行一下，如下代码所示：
+
+```javascript
+let scriptBegin = Date.now();
+fun1();
+fun2();
+
+// 需要执行20ms的工作单元
+function act(functionName){
+    console.log(functionName, Date.now() - scriptBegin);
+    let begin = Date.now();
+    while(Date.now() - begin < 20);
+}
+function fun1(){
+    let fun3 = () => act("fun3");
+    setTimeout(fun3, 0);
+    act("fun1");
+}
+function fun2(){
+    act("fun2 - 1");
+    let fun4 = () => act("fun4");
+    setInterval(fun4, 20);
+    act("fun2 - 2");
+}
+```
+
+这个代码的执行模型是这样的：
+
+![代码执行模型](https://user-gold-cdn.xitu.io/2017/9/3/f0a16d027e34ec4c17e3f4c0f8886cd3?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+控制台输出：
+
+![控制台输出](https://user-gold-cdn.xitu.io/2017/9/3/2b2d2d41fb0e19d67dd7ee39093d404b?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+与上面的模型分析一致。
+
+接着再讨论最后一个话题，函数节流。
+
+## 7. 函数节流
+
+节流的目的是为了不想触发执行的太快，比如：
+
+> * 监听input触发搜索
+> * 监听resize做响应式调整
+> * 监听mousemove调整位置
+
+我们先看一下，resize/mousemove事件1s内能触发多少次，于是写了以下代码：
+
+```javascript
+let begin = 0;
+let count = 0;
+window.resize = function(){
+    count++;
+    let now = Date.now();
+    if(!begin){
+        begin = now;
+        return;
+    }
+    if((now - begin) % 1000 < 60){
+        console.log(now - begin, count / (now - begin) * 1000);
+    } 
+};
+```
+
+当把窗口拉得比较快的时候，resize事件大概是1s触发40次：
+
+![resize事件触发频率](https://user-gold-cdn.xitu.io/2017/9/3/2ab94229cd6b7e72a43f16cd80d213aa?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+需要注意的是，并不是说你拉得越快，触发得就越快。实际情况是，拉得越快触发得越慢，因为拉动的时候页面需要重绘，变化的越快，重绘的次数也就越多，所以导致触发得更少了。
+
+mousemove事件在我的电脑的Chrome上1s大概触发了60次：
+
+![mousemove事件触发的频率](https://user-gold-cdn.xitu.io/2017/9/3/53980650b625d9f54fe56ca9bab34fab?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+如果你需要监听resize事件做DOM调整的话，这个调整比较费时，1s要调整40次，这样可能响应不过来，并且不需要调整的那么频繁，所以需要节流。
+
+怎么实现一个节流呢，书里是这么实现的。
+
+```javascript
+function throttle(method, context){
+    clearTimeout(method.tId);
+    method.tId = setTimeout(function(){
+        method.call(context);
+    }, 100);
+}
+```
+
+每次执行都要setTimeout一下，如果触发得很快就把上一次的setTimeout清掉重新setTimeout，这样就不会执行的很快了。但是这样有个问题，就是这个回调函数可能永远不会执行，因为它一直在触发，一直在清掉tId，这样就有点尴尬，上面代码的本意应该是100ms内最多触发一次，而实际情况是可能永远不会执行。这种实现应该叫防抖，而不是节流。
+
+把上面的代码稍微改造一下：
+
+```javascript
+function throttle(method, context){
+    if(method.tId){
+        return;
+    }
+    method.tId = setTimeout(function(){
+        method.call(context);
+        method.tId = 0;
+    }, 100);
+}
+```
+
+这个实现就是正确的，每100ms最多执行一次回调，原理是在setTimeout里面把tId给置成0，这样能让下一次的触发执行。实际实验一下：
+
+![实际结果](https://user-gold-cdn.xitu.io/2017/9/3/0310ddcbed5f2fe42d18cefffa2b3d7c?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+大概每100ms就执行一次，这样就达到了我们的目的。
+
+但是这样还有一个小问题，就是每次执行都是要延迟100ms，有时候用户可能就是最大化了窗口，只触发了一次resize事件，但是这次还是得延迟100ms才能执行，假设你的时间是500ms，那就得延迟半秒，因此这个实现不太理想。
+
+需要优化，如下代码所示：
+
+```javascript
+function throttle(method, context) {
+    // 如果是第一次触发，立刻执行
+    if (typeof method.tId === "undefined") {
+        method.call(context);
+    }
+    if (method.tId) {
+        return;
+    }
+    method.tId = setTimeout(function() {
+        method.call(context);
+        method.tId = 0;
+    }, 100);
+}
+```
+
+先判断是否为第一次触发，如果是的话立刻执行。这样就解决了上面提到的问题，但是这个实现还是有问题，因为它只是全局的第一次，用户最大化之后，隔了一会又取消最大化了就又有延迟了，并且第一次触发会执行两次。那怎么办呢？
+
+笔者想到一个办法：
+
+```javascript
+function throttle(method, context) {
+    if (!method.tId) {
+        method.call(context);
+        method.tId = 1;
+        setTimeout(() => method.tId = 0, 100);
+    }
+}
+```
+
+每次触发的时候立刻执行，然后再设定一个计时器，把tId置成0，实际的效果如下：
+
+![实际效果](https://user-gold-cdn.xitu.io/2017/9/3/d55b504af7abcd28d31e30a92ecfbd99?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+这个实现比之前的实现还要简洁，并且能够解决延迟的问题。
+
+所以通过节流，把执行次数降到了1s执行10次，节流时间也可以控制，但同时失去了灵敏度，如果你需要高灵敏度就不应该使用节流，例如做一个拖拽的应用，如果节流了会怎么样？用户会发现拖起来一卡一卡的。
+
+笔者重新看了高程的《高级技巧》的章节结合自己的理解和实践总结了这么一篇文章，我的体会是如果看书看博客只是当作睡前读物看一看其实收获不是很大，没有实际地把书里的代码实践一下，没有结合自己的编码经验，就不能用自己的理解去融入这个知识点，从而转化为自己的知识。你可能会说我看了之后就会印象啊，有印象还是好的，但是你花了那么多时间看了那本书只是得到了一个印象，你自己都没有实践过的印象，这个印象又有多靠谱呢。如果别人问到了这个印象，你可能会回答出一些连不起来的碎片，就会给人一种背书的感觉。还有有时候书里可能会有一些错误或者过时的东西，只有实践了才能出真知。
