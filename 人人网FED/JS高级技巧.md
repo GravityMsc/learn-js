@@ -298,3 +298,28 @@ data.sortDescending();
 console.log(data);	// [10, 5, 3, 2, 1]
 ```
 
+## 5. 防止篡改对象
+
+有时候你可能怕你的对象被误改了，所以需要把它保护起来。
+
+（1）Object.seal防止新增和删除属性
+
+如下代码，当把一个对象seal之后，将不能添加和删除属性。
+
+![阻止对象添加和删除属性](https://user-gold-cdn.xitu.io/2017/9/3/9c3b7ae838e7d7cf9cdec8aa98ee61a7?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+当使用严格模式将会抛出异常。
+
+![严格模式下抛出异常](https://user-gold-cdn.xitu.io/2017/9/3/ee58ecb88a3ca505e70fed2e6025548a?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+（2）Object.freeze冻结对象
+
+这个数不能改属性值，如下图所示。
+
+![Object.freeze冻结](https://user-gold-cdn.xitu.io/2017/9/3/eb52073e8e900111de3143b50a038a1a?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+同时可以使用Object.isFrozen、Object.isSealed、Object.isExtensible判断当前对象的状态。
+
+（3）defineProperty冻结单个属性
+
+如下图所示，设置enumable/writable为false，那么
