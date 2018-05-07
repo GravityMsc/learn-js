@@ -146,3 +146,28 @@ xhr.send("id=5&name=yin");
 
 由于中文在utf-8需要占用3个字符，所以它有3个%符号。
 
+我们刚刚是xhr.send一个字符串，如果send一个Object会怎么样呢？如下代码所示：
+
+```javascript
+let xhr = new XMLHttpRequest();
+xhr.open("POST", "/add");
+xhr.send({id: 5, name: "yin"});
+```
+
+检查控制台的时候是怎样的：
+
+![对象的xhr.send的结果](https://user-gold-cdn.xitu.io/2018/2/3/1615af120b024007?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+也就是说，实际上是调用了Object的toString方法。所以可以看到，在send的数据需要转成字符串。
+
+除了字符串之外，send还支持FormData/Blob等格式，如：
+
+```javascript
+let form = $("form")[0];
+xhr.send(new FormData(form));
+```
+
+但最后都是被转成字符串发送。
+
+我们再看下其他的请求格式，如[Github的REST API](https://developer.github.com/v3/)是使用json的格式发送请求：
+
