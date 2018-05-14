@@ -107,3 +107,389 @@ data.name = '渣渣辉';
 我们都知道，Object.defineProperty的作用就是劫持一个对象的属性，通常我们对属性的getter和setter方法进行劫持，在对象的属性发生变化时进行特定的操作。
 
 我们就对对象obj的text属性进行劫持，在获取此属性的值时打印'get val'，在更改属性值的时候对DOM进行操作，这就是一个极简的双向绑定。
+
+```javascript
+const obj = {};
+Object.defineProperty(obj, 'text', {
+    get: function(){
+        console.log('get val');
+    },
+    set: function(newVal){
+        console.log('set val:' + newVal);
+        document.getElementById('input').value = newVal;
+        document.getElementById('span').innerHTML = newVal;
+    }
+});
+
+const input = document.getElementById('input');
+input.addEventListener('keyup', function(e){
+    obj.text = e.target.value;
+});
+```
+
+### 2.2 升级改造
+
+我们很快会发现，这个所谓的双向绑定貌似并没有什么卵用。
+
+原因如下：
+
+1. 我们只监听了一个属性，一个对象不可能只有一个属性，我们需要对对象每个属性都进行监听。
+2. 违反开放封闭原则，我们如果了解[开放封闭原则](https://zh.wikipedia.org/zh-hans/%E5%BC%80%E9%97%AD%E5%8E%9F%E5%88%99)的话，上述代码时明显违反此原则的，我们每次修改都需要进入方法内部，这是需要坚决杜绝的。
+3. 代码耦合严重，我们的数据、方法和DOM都是耦合在一起的，就是传说中的面条代码。
+
+那么如何解决上述问题呢？
+
+Vue的操作就是加入了发布订阅模式，结合Object.defineProperty的劫持能力，实现了可用性很高的双向绑定。
+
+首先，我们以发布订阅的角度看我们第一部分的那一坨代码，会发现它的监听、发布和订阅都是写在一起的，我们首先要做的就是解耦。
+
+我们先实现一个订阅发布中心，即消息管理员（Dep），它负责储存订阅者和消息的分发，不管是订阅者还是发布者都需要依赖于它。
+
+```javascript
+let uid = 0;
+// 用于储存订阅者并发布消息
+class Dep{
+    constructor(){
+        // 设置id，用于区分新Watcher和只改变属性值后新产生的Watcher
+        this.id = uid++;
+        // 储存订阅者的数组
+        this.subs = [];
+    }
+    // 触发target上的Watcher中的addDep方法，参数为dep的实例本身
+    depend(){
+        Dep.target.addDep(this);
+    }
+    // 添加订阅者
+    addSub(){
+        this.subs.push(sub);
+    }
+    notify(){
+        // 通知所有的订阅者（Watcher），触发订阅者的相应逻辑处理
+        this.subs.forEach(sub => sub.update());
+    }
+}
+
+// 为Dep类设置一个静态属性，默认为null，工作时指向当前的Watcher
+Dep.target = null;
+```
+
+现在我们需要实现监听者（Observer），用于监听属性值的变化。
+
+```javascript
+// 监听者，监听对象属性值的变化
+class Observer {
+    constructor(value){
+        this.value = value;
+        this.walk(value);
+    }
+    
+    // 遍历属性并监听
+    walk(value){
+        Object.keys(value).forEach(key => this.convert(key, value[key]));
+    }
+    // 指向监听的具体办法
+    convert(key, val){
+        defineReactive(this.value, key, val);
+    }
+}
+
+function defineReactive(obj, key, val){
+    const dep = new Dep();
+    // 给当前属性的值添加监听
+    let childOb = observe(val);
+    Object.defineProperty(obj, key, {
+        enumerable: true,
+        configurable: true,
+        get: () => {
+            // 如果Dep类存在target属性，将其添加到dep实例的subs数组中
+            // target指向一个Watcher实例，每个Watcher都是一个订阅者
+            // Watcher实例在实例化过程中，会读取data中的某个属性，从而触发当前get方法
+            if(Dep.target){
+                dep.depend();
+            }
+            return val;
+        },
+        set: newVal => {
+            if(val === newVal)return;
+            val = newVal;
+            // 对新值进行监听
+            childOb = observe(newVal);
+            // 通知所有订阅者，数值被改变了
+            dep.notify();
+        },
+    });
+}
+
+function observe(value){
+    // 当值不存在，或者不是复杂数据类型时，不再需要继续深入监听
+    if(!value || typeof value !== 'object'){
+        return;
+    }
+    return new Observer(value);
+}
+```
+
+那么接下来就简单了，我们需要实现一个订阅者（Watcher）。
+
+```javascript
+class Watcher {
+    constructor(vm, expOrFn, cb){
+        this.depIds = {}; // hash储存订阅者的id，避免重复的订阅者
+        this.vm = vm; // 被订阅的数据一定来自于当前Vue实例
+        this.cb = cb; // 当数据更新时想要做的事情
+        this.expOrFn = expOrFn; // 被订阅的数据
+        this.val = this.get(); // 维护更新之前的数据
+    }
+    
+    // 对外暴露的接口，用于在订阅的数据被更新时，由订阅者管理员（Dep）调用
+    update(){
+        this.run();
+    }
+    addDep(dep){
+        // 如果在depIds的hash中没有当前的id，可以判断是新Watcher，因此可以添加到dep的数组中储存
+        // 此判断是避免同id的Watcher被多次劫持
+        if(!this.depIds.hasOwnProperty(dep.id)){
+            dep.addSub(this);
+            this.depIds[dep.id] = dep;
+        }
+    }
+    run(){
+        const val = this.get();
+        console.log(val);
+        if(val !== this.val){
+            this.val = val;
+            this.cb.call(this.vm, val);
+        }
+    }
+    get(){
+        // 当前订阅者（Watcher）读取被订阅数据的最新更新后的值时，通知订阅者管理员手机当前订阅者
+        Dep.target = this;
+        const val = this.vm._data[this.expOrFn];
+        // 置空，用于下一个Watcher使用
+        Dep.target = null;
+        return val;
+    }
+}
+```
+
+那么我们最后完成Vue，将上述方法挂载在Vue上。
+
+```javascript
+class Vue{
+    constructor(options = {}){
+        // 简化了$options的处理
+        this.$options = options;
+        // 简化了对data的处理
+        let data = (this._data = this.$options.data);
+        // 将所有data最外层属性代理到Vue实例上
+        Object.keys(data).forEach(key => this._proxy(key));
+        // 监听数据
+        observe(data);
+    }
+    // 对外暴露订阅者的接口，内部主要在指令中使用订阅者
+    $watch(expOrFn, cb){
+        new Watcher(this, expOrFn, cb);
+    }
+    _proxy(key){
+        Object.defineProperty(this, key, {
+            configurable: true,
+            enumerable: true,
+            get: () => this._data[key],
+            set: val => {
+                this._data[key] = val;
+            },
+        });
+    }
+}
+```
+
+看下效果：
+
+![双向绑定实现---无漏洞版](https://user-gold-cdn.xitu.io/2018/5/1/1631c5aa9c52493e?imageslim)
+
+至此，一个简单的双向绑定算是被我们实现了。
+
+### 2.3 Object.defineProperty的缺陷
+
+其实我们升级版的双向绑定依然存在漏洞，比如我们将属性值改为数组。
+
+```javascript
+let demo = new Vue({
+    data: {
+        list: [1],
+    },
+});
+
+const list = document.getElementById('list');
+const btn = document.getElementById('btn');
+
+btn.addEventListener('click', function(){
+    demo.list.push(1);
+});
+
+const render = arr => {
+    const fragment = document.createDocumentFragment();
+    for(let i = 0; i < arr.length; i++){
+        const li = document.createElement('li');
+        fragment.appendChild(li);
+    }
+    list.appendChild(fragment);
+};
+
+// 监听数组，每次数组变化则触发渲染函数，然而...无法监听
+demo.$watch('list', list => render(list));
+
+setTimeout(
+    function(){
+        alert(demo.list);
+    },
+    5000,
+);
+```
+
+是的，Object.defineProperty的第一个缺陷就是无法监听数组变化。然而[Vue的文档](https://cn.vuejs.org/v2/guide/list.html#%E6%95%B0%E7%BB%84%E6%9B%B4%E6%96%B0%E6%A3%80%E6%B5%8B)提到了Vue是可以检测到数组变化的，但是只有以下八种方法，vm.items[indexOfItem] = newValue这种是无法检测的。
+
+>push(), pop(), shift(), unshift(), splice(), sort(), reverse()
+
+其实作者在这里用了一些奇技淫巧，把无法监听数组的情况给hack掉了，以下是方法示例。
+
+```javascript
+const aryMethods = ['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse'];
+const arrayAugmentations = [];
+
+aryMethods.forEach((method) => {
+   // 这里是原生Array的原型方法
+    let original = Array.prototype[method];
+    
+    // 将push，pop等封装好的方法定义在对象arrayAugmentations的属性上
+    // 注意：是属性而非原型属性
+    arrayAugmentations[method] = function () {
+        console.log('我被改变啦！');
+        
+        // 调用对应的原生方法并返回结果
+        return original.apply(this, arguments);
+    };
+});
+
+let list = ['a', 'b', 'c'];
+// 将我们要监听的数组的原型指针指向上面定义的空数组对象
+// 别忘了这个空数组的属性上定义了我们封装好的push等方法
+list.__proto__ = arrayAugmentations;
+list.push('d');		// 我被改变啦！ 4
+
+// 这里的list2没有被重新定义原型指针，所以就正常输出
+let list2 = ['a', 'b', 'c'];
+list2.push('d');	// 4
+```
+
+由于只针对了八种方法进行了hack，所以其他数组的属性也是检测不到的，其中的坑很多，可以阅读上面提到的文档。
+
+我们应该注意到在上文中的实现里，我们多次遍历方法遍历对象的属性，这就引出了Object.defineProperty的第二个缺陷，只能劫持对象的属性，因此我们需要对每个对象的每个属性进行遍历，如果属性值也是对象那么需要深度遍历，显然能劫持一个完整的对象是更好的选择。
+
+```javascript
+Object.keys(value).forEach(key => this.convert(key, value[key]));
+```
+
+## 3. Proxy实现的双向绑定的特点
+
+Proxy在ES2015规范中被正式发布，它在目标对象之间架设一层“拦截”，外界对该对象的访问，都必须通过这层拦截，因此提供了一种机制，可以对外界的访问进行过滤和改写，我们可以这样认为，Proxy是Object.defineProperty的全方位加强版，具体的文档可以查看[此处](http://es6.ruanyifeng.com/#docs/proxy)；
+
+### 3.1 Proxy可以直接监听对象而非属性
+
+我们还是以上文中用Object.defineProperty实现的极简版双向绑定为例，用Proxy进行改写。
+
+```javascript
+const input = document.getElementById('input');
+const p = document.getElementById('p');
+const obj = {};
+
+const newObj = new Proxy(obj, {
+    get: function(target, key, receiver){
+        console.log(`getting ${key}!`);
+        return Reflect.get(target, key, receiver);
+    },
+    set: function(target, key, value, receiver){
+        console.log(target, key, value, receiver);
+        if(key === 'text'){
+            input.value = value;
+            p.innerHTML = value;
+        }
+        return Reflect.set(target, key, value, receiver);
+    },
+});
+
+input.addEventListener('keyup', function(e){
+    newObj.text = e.target.value;
+});
+```
+
+我们可以看到，Proxy直接可以劫持整个对象，并返回一个新对象，不管是操作便利程度，还是底层功能上都远强于Object.defineProperty。
+
+### 3.2 Proxy可以直接监听数组的变化
+
+当我们对数组进行操作（push、shift、splice等）时，会触发对应的方法名称和length的变化，我们可以借此进行操作，以上文中Object.defineProperty无法生效的列表渲染为例。
+
+```javascript
+const list = document.getElementById('list');
+const btn = document.getElementById('btn');
+
+// 渲染列表
+const Render = {
+    // 初始化
+    init: function(arr) {
+        const fragment = document.createDocumentFragment();
+        for(let i = 0; i < arr.length; i++){
+            const li = document.createElement('li');
+            li.textContent = arr[i];
+            fragment.appendChild(li);
+        }
+        list.appendChild(fragment);
+    },
+    // 我们只考虑了增加的情况，仅作为示例
+    change: function(val){
+        const li = document.createElement('li');
+        li.textContent = val;
+        list.appendChild(li);
+    },
+};
+
+// 初始数组
+const arr = [1, 2, 3, 4];
+
+// 监听数组
+const newArr = new Proxy(arr, {
+    get: function(target, key, receiver){
+        console.log(key);
+        return Reflect.get(target, key, receiver);
+    },
+    set: function(target, key, value, receiver){
+        console.log(target, key, value, receiver);
+        if(key !== 'length'){
+            Render.change(value);
+        }
+        return Reflect.set(target, key, value, receiver);
+    },
+});
+
+// 初始化
+window.onload = function(){
+    Render.init(arr);
+};
+
+// push数字
+btn.addEventListener('click', function(){
+    newArr.push(6);
+});
+```
+
+很显然，Proxy不需要那么多hack（即使hack也无法完美实现监听）就可以无压力监听数组的变化，我们都知道，标准永远优先于hack。
+
+### 3.3 Proxy的其他优势
+
+Proxy有多达13种拦截方法，不限于apply、ownKeys、deleteProperty、has等等是Object.defineProperty不具备的。
+
+Proxy返回的是一个新对象，我们可以只操作新的对象达到目的，而Object.defineProperty只能遍历对象属性直接修改。
+
+Proxy作为新标准将收到浏览器厂商重点持续的性能优化，也就是传说中的新标准的性能红利。
+
+当然Proxy的劣势就是兼容性问题，而且无法用polyfill磨平，因此Vue的作者才声明需要等到下个大版本（3.0）才能用Proxy重写。
