@@ -235,3 +235,59 @@ mounted(){
 ```
 
 这样，子组件的子组件也可以获取这个值了。
+
+## 四：混入——mixins
+
+其实这个功能有些类似于es6中的Object.assign()方法。根据一定的规则合并两个配置，具体的混入策略可以看官方文档：[mixins混入策略](https://cn.vuejs.org/v2/guide/mixins.html)
+
+混入最大的用处是把一些常用的data或者methods等抽出来，比如在我的项目中有许多个模态框，而关闭模态框的代码逻辑是一模一样的，为此我没有必要在多个组件中重复把关闭模态框的逻辑写入methods中，只需要在外面定义一个mixins，在需要的组件中通过：mixins: [myMin]写入即可。
+
+```javascript
+var mixin = {
+    methods: {
+        close: function (){
+            this.showModal = false;	//关闭模态框
+        },
+    }
+}
+
+var vm = new Vue({
+    mixins: [mixin],
+    .....
+})
+```
+
+## 五：provide / inject
+
+provide/inject方法要比inheritAttrs/attrs更适合用来做父组件给子组件或后代组件传值，先发一个文档的链接：[provide/inject](https://cn.vuejs.org/v2/api/#provide-inject)
+
+```vue
+//父组件使用provide
+<template>  
+	<div class="parent">      
+        <child-component></child-component>    
+    </div> 
+</template>
+
+<script>
+    export default { 
+        ......  
+        provide: {    
+        	parent: "父组件的值"  
+    	},  
+        components:{    
+            child-component,  
+        },  
+           ......
+</script>
+
+//此时可以在子组件通过这种方式获取父组件中“parent”的值：
+//子组件中
+export default {  
+	mounted(){      
+		console.log(this.parent); //"父组件的值"  
+	},  
+	inject: ['parent'],
+}
+```
+
