@@ -281,3 +281,280 @@ f(1000, 5000, 5);
 
 ## 4. 我从接口拿到了返回的json数据，但是我又要操作这个数据而且不能污染原数据
 
+某人不假思索秒回：var data2 = data
+
+另一个路人稍加思考：不是吧，你先要深拷贝一下。
+
+问题少年：那怎么深拷贝呢
+
+某路人：JSON.stringify再JSON.parse
+
+问题少年：谢啦，真好用。
+
+稍微了解的人都知道，一个stringify并不能解决所有的深拷贝问题。第二天，问题少年又来了：我用了转义来拷贝，老板说要弄死我，现在项目里面所有的面向对象都炸了。
+
+某路人：我曹，我就不信还有什么是stringify和parse解决不了的。
+
+另一个路人：原型链断了、undefined变成空值、环引用出错，用了面向对象的全部泡汤了。
+
+问题少年特别无助，也没有人出来帮忙，也许上天有一个稍微好一点点的参考答案，等着他的发掘：
+
+```javascript
+function copy(arr){
+    var temp;
+    if(typeof arr === 'number' || typeof arr === 'boolean' || typeof arr === 'string'){
+        return arr;
+    }
+    if(Object.prototype.toString.call(arr) === "[object Array]"){
+        temp = [];
+        for(x in arr){
+            temp[x] = copy(arr[x]);
+        }
+        return temp;
+    } else if(Object.prototype.toString.call(arr) === "[object RegExp]"){
+        temp = arr.valueOf();
+        var str = (temp.global ? 'g' : '') + (temp.ignoreCase ? 'i' : '') + (temp.multiline ? 'm' : '');
+        return new RegExp(arr.valueOf().source, str);
+    } else if(Object.prototype.toString.call(arr) === "[object Function]"){
+        var str = arr.toString();
+        /^function\s*\w*\s*\(.*\)\s*\{(.*)/m.test(str);
+        var str1 = RegExp.$1.slice(0, -1);
+        return new Function(str1);	// 函数有换行就出事，求更好的解决办法
+    } else if(Object.prototype.toString.call(arr) === "[object Date]"){
+        return new Date(arr.valueOf());
+    } else if(Object.prototype.toString.call(arr) === "[object Object]"){
+        try{
+            temp = JSON.parse(JSON.stringify(arr));
+        } catch(e){ //环引用解决：取出环引用部分用stringify再放回去
+            var temp1 = {},
+                circle,
+                result,
+                reset = false,
+                hash;
+            function traverse(obj){
+                for(x in obj){
+                    if(!reset && obj.hasOwnProperty(x)){
+                        if(!temp1[x]){
+                            temp1[x] = obj[x];
+                        } else if(typeof obj[x] === 'object' && typeof temp1[x] === 'object'){
+                            try{
+                                JSON.stringify(obj[x]);
+                            } catch(e){
+                                circle = obj[x];
+                                hash = new Date().getTime();
+                                obj[x] = hash;
+                                break;
+                            } finally{
+                                return traverse(obj[x]);
+                            }
+                        }
+                        if(typeof obj[x] === 'object'){
+                            return traverse(obj[x]);
+                        }
+                    } else if(reset){
+                        if(obj[x] === hash){
+                            obj[x] = circle;
+                            return;
+                        }
+                        if(typeof obj[x] === 'object'){
+                            return traverse(obj[x]);
+                        }
+                    }
+                }
+            }
+            traverse(arr);
+            result = JSON.parse(JSON.stringify(arr));
+            reset = true;
+            traverse(result);
+            traverse(arr);
+            temp = result;
+        } finally{ // 考虑到原型链和Object.create(null)
+            if(arr.__proto__.constructor && arr.__proto__.constructor !== Object){
+                temp.__proto__.constructor = arr.__proto__.cosntructor;
+            }
+            if(!arr.__proto__.constructor){
+                temp.__proto__.constructor = null;
+            }
+            return temp;
+        }
+    }
+    if(!arr){
+        return arr;
+    }
+}
+```
+
+## 5. 在数组内动态添加元素，打钩的求和
+
+给出的图片大概是这样的，选取某个li就把它的价格算入sum里面：
+
+![数组示例的图片](https://user-gold-cdn.xitu.io/2018/5/3/16324fe10ad28439?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+相信50%的人都会这样子，某路人：vue，v-for显示，computed。
+
+甚至有的人2分钟把代码撸出来了：
+
+html:
+
+```html
+<script src="https://cdn.bootcss.com/vue/2.5.13/vue.min.js"></script>
+<div id="app">
+    <ul>
+        <li v-for="x in list">
+        	{{x.price}}
+            <input type="checkbox" v-model="x.selected">
+        </li>
+    </ul>
+    <button @click="add">
+        add
+    </button>
+</div>
+```
+
+js：
+
+```javascript
+new Vue({
+    el: '#app',
+    data(){
+        return {
+            list:[{price: 1, selected: false},
+                  {price: 2, selected: false},
+                  {price: 3, selected: false}]
+        }
+    },
+    methods: {
+        add(){
+            this.list.push({price: 1, selected: false});
+        }
+    },
+    computed: {
+        sum(){
+            return this.list.reduce((s, x) => x.selected ? +x.price +s : s, 0);
+        }
+    }
+})
+```
+
+问题少年：我们项目不用Vue。
+
+我们项目这个模块就只用面向对象，工具库偶尔用用lodash。
+
+另外lodash深拷贝，目前算是最完美的深拷贝。
+
+我们可以猜想到问题少年想写的代码：
+
+html：
+
+```html
+<ul id="app">
+    
+</ul>
+```
+
+js：
+
+```javascript
+app.addEventListener('change', (function(){
+	var lastPick = 0;
+    return function(e){ //相信很多人是每次change后，用循环一个个加起来的
+        lastPick += e.target.checked? +e.target.value : -e.target.value;
+        res.innerHTML = lastPick;
+    }
+})());
+var list = [{price: 1, selected: false},
+                  {price: 2, selected: false},
+                  {price: 3, selected: false}];
+var append = '';
+for(var i = 0; i < list.length; i++){
+    append += '<li><input type="checkbox" value=' + list[i].price + '>' + list[i].price + '</li>';
+}
+app.innerHTML = append;
+```
+
+## 6. 后端不帮我分页，前端分页怎么容易一点
+
+问题少年：是个人中心来的，数据不多，而且用户一般都会一页页去浏览全部数据的，因为这些消费数据必须全部看一遍才能了解情况。
+
+路人甲：拿到全部数据后，根据每页数据和第几页for循环取出元素并插入相应的html，每次切换也遍历一次。
+
+路人乙：卧槽，这后端吃屎的吧，居然不分页。
+
+路人丙：当然是按需加载啊，你不应该一下加载完全部。
+
+路人丁：用jQuery分页插件啊。
+
+于是勤劳热心爱解答问题的群友马上写出了答案：
+
+html：
+
+```html
+<select id="app">
+    <option>2</option>
+    <option>3</option>
+    <option>4</option>
+</select>
+<div>
+    <button onclick="pre()">上一页</button>
+    <button onclick="next()">下一页</button>
+    <p>当前是<span id="current"></span>页</p>
+    <table>
+      	<tbody id="content">
+      	</tbody>
+      </table>
+</div>
+```
+
+js：
+
+```javascript
+var data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]	// 后端拿到的数据
+var currentIndex = 1;
+var per = 2;
+app.onchange = function(e){
+    per = e.target.value;
+    update(1);	//更改每页数据时候返回第一页
+}
+function pre(){
+    currentIndex = currentIndex > 1 ? currentIndex -1 : currentIndex;
+    update(currentIndex, per);
+}
+function next(){
+    currentIndex = currentIndex < Math.floor(data.length / per) + 1 ? currentIndex + 1 : currentIndex;
+    update(currentIndex, per);
+}
+window.onload = function(){
+    update();
+}
+function update(currentPage, perPage){
+    var currentPage = currentPage || currentIndex;
+    var perPage = perPage || per;
+    var ctx = '';
+    for(var i = perPage * (currentPage - 1); i < perPage * currentPage; i++){
+        if(data[i] !== undefined) ctx += '<tr><td>' + data[i] + '</td></tr>';
+    }
+    content.innerHTML = ctx;
+    content.innerHTML = currentPage;
+}
+```
+
+当然，后端不帮忙分页的情况下，通常数据量是不大的，上面的做法也是没什么问题。但是，在这个场景下，用户需要浏览器所有的数据，所以不存在什么按需分页。我们不应该在用户需要的时候才循环的，这样子对于用户，时间复杂度是n。如果是先分页再直接拿出来，复杂度就是1。这个场景下，他是全部都浏览的，所以我们先分页再取数据。改进的js：
+
+```javascript
+var data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+
+var currentIndex = 1;
+var per = 2;
+var list = [];
+app.onchange = function(e){
+    per = +e.target.value;
+    getdatalist(per);
+    update(1);
+}
+function pre(){
+    console.time()
+}
+```
+
+
+
