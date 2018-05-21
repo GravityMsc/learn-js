@@ -552,9 +552,136 @@ app.onchange = function(e){
     update(1);
 }
 function pre(){
-    console.time()
+    console.time('pre');
+    currentIndex = currentIndex > 1 ? currentIndex - 1 : currentIndex;
+    update(currentIndex, per);
+    console.timeEnd('pre');
+}
+function next(){
+    console.time('next');
+    currentIndex = currentIndex < Math.floor(data.length / per) + 1 ? currentIndex + 1 : currentIndex;
+    update(currentIndex, per);
+    console.timeEnd('next');
+}
+window.onload = function(){
+    getdatalist(2);
+    update();
+}
+function getdatalist(per){
+    var per = per || 2;
+    var list = [];
+    var pages = ~~(data.length/per) + 1;
+    for(var i = 0; i < pages; i++){
+        var temp = '';
+        data.slice(i * per, i * per + per).forEach(function(item){
+            temp += '<tr><td>' + item + '</td></tr>';
+        });
+        list.push(temp);
+    }
+}
+function update(currentPage, perPage){
+    currentIndex = currentPage || 1;
+    var perPage = perPage || per;
+    content.innerHTML = list[currentIndex - 1];
+    current.innerHTML = currentIndex;
 }
 ```
 
+时间测试：
 
+用户切换页面的时候时间消耗：
+
+按需循环：
+
+![按需循环](https://user-gold-cdn.xitu.io/2018/5/3/16324fe10ca86e2c?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+提前分页：
+
+![提前分页](https://user-gold-cdn.xitu.io/2018/5/3/16324fe10cbde57b?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+随着分页越来越多，提前分页在切换的时间上的优势越来越大。当然，正常的情况下用户一般都不会把全部数据都浏览完的，所以一般也是用按需分页更好。
+
+## 7. 我们要做一个抽奖活动，需要用户的号码存在两个数和为100算中奖
+
+问题少年：随机数字分布得比较均匀（但是乱序），比如3、2、1、4、5、7，而不是5、1、6、7、8
+
+路人甲：一个个循环，再判断。
+
+```javascript
+let arr = [12, 40, 60, 80, 62, 13, 58, 87];
+let obj = {};
+arr.map(item => {
+    if(!obj[item]){
+        let val = 100 - item;
+        obj[item] = 1;
+        if(arr.includes(val)){
+            obj[val] = 1;
+            console.log(item, val);
+        }
+    }
+});
+```
+
+可是，这ES6用得有点浪费了。问题少年貌似不满足，说：我们的数据量可能有一点大。
+
+于是，有一个双指针版本。
+
+```javascript
+function f(arr, res){
+    var l = arr.length;
+    var p = ~~(l/2);
+    var i = p - 1;
+    var j = p;
+    var ishasresult = false;
+    arr = arr.sort((a, b) => a - b);
+    while(i >= 0 && j < l){
+        if(arr[i] + arr[j] > res){
+            i--;
+        } else if(arr[i] + arr[j] < res){
+            j++;
+        } else {
+            ishasresult = true;
+            break;
+        }
+    }
+    return ishasresult;
+}
+```
+
+假设排序为快排，总的时间复杂度就是nlogn + logn。
+
+其实，用ES6的话，这样子更快：
+
+```javascript
+var mySet = new Set(arr);
+arr.find(function(value, index, arr){
+    return mySet.has(100 - value);
+});
+```
+
+时间测试：
+
+无脑ES6循环：2.419189453125ms    2.35595703125ms   1.330078125ms
+
+双指针： 0.0400390625ms   0.0283203125ms  0.0390625ms
+
+简化ES6：0.1240234375ms    0.10986328125ms    0.092041015625ms
+
+## 8. 数组向头部添加元素，concat和一个个unshift哪个效率高
+
+路人甲：unshift，毕竟它是专门在头部添加的，concat是连接数组的，算法肯定比unshift复杂，es6...（扩展运算符）算是淘汰了concat了吧。
+
+测试结果：
+
+![unshift和concat的比对测试](https://user-gold-cdn.xitu.io/2018/5/3/16324fe10ca7d646?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+很明显的，unshift和扩展运算符是一个个遍历，concat就是直接连起来复杂度为1。但是还是需要看实际场景的，没有绝对的淘汰、取代的这种说法。
+
+## 总结
+
+是不是道出了一些熟悉的经历？循环啊、遍历，再XXX，用Vue啊，用jQuery的xx，用xx插件。对于问问题的人，要先表示清楚需求，尽量讲详细一点，而不是随便截个图就问，能百度能靠文档的，也没有必要问。如果是有意义的问题，那么大家就得好好思考，了解人家的应用场景，而不是无脑循环，也不是直接抛一个xx插件、xx.js给人家，因为人家月懂的，只是想要一个更好的答案或者不是一个无脑的答案。当然，纯小白的话就算了。
+
+如果是大牛，也许朋友圈子里面没有这种事情，也没有进这种群。我也是学了半年的菜鸟，很多应用场景的经验不足。但是有的人，工作了几年还写出一些无脑的代码，代码中又暴露了各种细节没怎么处理。不是说我觉得他们不如我，我只是感觉，这可能就是一些人工作10年1年经验的原因。
+
+另外，面试的时候，是不是经常被问闭包拿来干什么的，上面例子有几个经典的闭包应用所以面试的时候不要只是说出闭包是什么、闭包会内存泄漏，也要知道，闭包用于干什么，无非就是缓存、柯里化、单例模式、模块化，而且能保护内部变量。那么，也问一下自己，究竟有没有用过闭包来干一些有意义的事情，有没有说过“无缘无故搞个IIFE有什么用”这种话？你的ES6仅仅是不是拿来简写或者追求视觉上的代码剪短来装逼的呢，有没有把proxy玩得飞起，解构赋值用的多吗，有没有知道不能捕获异步的try可以考async + await捕捉异步，set用过最多的是不是去重，常用的除了let、const、promise、async-await、...、set、反引号+字符串模板之后是不是没有其他的了？
 
