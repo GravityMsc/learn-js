@@ -399,8 +399,121 @@ console.log(clone);
 
 这些克隆方式只是黑科技，在项目中还是乖乖用lodash提供的clone方法吧。
 
-### 对象的不可变性
+## 对象的不可变性
 
 有时候你会希望属性或者对象是不可改变的，在ES5中可以通过多种方法来实现
 
-   
+### 对象常量
+
+结合writable: false和configurable: false就可以创建一个真正的常量属性（不可修改，重定义，或者删除）；
+
+```javascript
+var myObject = {};
+
+Object.defineProperty(myObject, "freez_number", {
+    value: 42,
+    writable: false,
+    configurable: false
+});
+```
+
+### 禁止扩展
+
+如果你想禁止一个对象添加新属性并且保留已有属性，可以使用Object.preventExtensions(...)
+
+```javascript
+var myObject = {
+    a: 2
+};
+
+Object.preventExtensions(myObject);
+
+myObject.b = 3;
+myObject.b	// undefined
+```
+
+### 密封
+
+Object.seal(...)会创建一个密封对象，这个方法实际上会在一个现有对象上调用Object.preventExtensions(...)并把所有属性标记为confirurable: false，这样就无法修改它们的值，这个方法是你可以应用在对象上的级别最高的不可变性，它会禁止对于对本身及其任意直接属性的修改。重要的一点：所有的方法创建的都是浅不可变性，也就是说，它们只会影响目标对象和它的直接属性。如果目标对象引用了其他对象（数组，对象，函数等等）其他对象的的内容不受影响，仍然是可变的。
+
+不过我们可以深度冻结一个对象，具体方法为，首先在这个对象上调用Object.freeze(...)然后遍历它引用的所有对象并在这些对象上调用Object.freeze(...)，但是一定要小心，因为这样做可能会在无意中冻结其他对象（共享对象）。
+
+### 为什么需要不可变性
+
+下面的代码能够体现不可变性的重要性
+
+```javascript
+var arr = [1, 2, 3];
+
+foo(arr);
+
+console.log(arr[0]);
+```
+
+从表面上讲，你可能会认为arr[0]的值仍为1，但事实上是否如此不得而知，因为foo(...)可能会改变你传入其中的arr所引用的数组，所以我需要上面的方法来让对象不可变：
+
+```javascript
+var arr = Object.freeze([1, 2, 3]);
+
+foo(arr);
+
+console.log(arr[0]);
+```
+
+可以非常确定arr[0]就是1，这是非常重要的，因为这可以使我们更容易理解代码，当我们将对象传递到我们看不到或者不能控制的地方，我们依然能够相信这个值不会改变。
+
+### 不可变性带来的性能问题
+
+每当我们开始创建一个新值（数组，对象）取代修改已经存在的值时，很明显的问题是，性能上会有问题。如果在你的程序中，只会发生一次或几次单一的状态变化，那么扔掉一个旧对象或旧数组完全没必要担心，性能损失会非常非常小——顶多几微秒。但是如果频繁的进行这样的操作，那么性能问题就需要考虑了。像数组这样的数据结构，我们期望除了能够保存其原始的数据，然后能追踪其每次改变并根据之前的版本创建一个分支，在内部，它可能就像一个对象引用的链表树，树中的每个节点都表示原始值的改变。
+
+![对象引用的链表树](https://user-gold-cdn.xitu.io/2018/3/29/16271ed79f300045?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+如果是开发的话，我们也可以使用Immutable.js这种成熟的库来进行开发。
+
+## Getter和Setter
+
+在ES5中可以使用getter和setter部分改写默认操作，但是只能应用在单个属性上，无法应用在整个对象上（ES6中proxy的出现可以改写整个对象），getter是一个隐藏函数，会在获取属性值时调用，setter也是一个隐藏的函数，会在设置属性值时调用。当你给一个属性定义getter，setter或者两者都有时，这个属性会被定义为访问描述符。对于访问描述符来说，JavaScript会忽略他们的value和writable特性，取而代之的是关心set和get（还有configurable和enumerable）特性。
+
+```javascript
+let myObject = {
+  get a(){
+    return this._a;
+  }
+  set a(val){
+    this._a = val * 2;
+  }
+}
+
+myObject.a = 2;
+myObject.a; //4
+```
+
+### 存在性
+
+看下面代码
+
+```javascript
+var myObject = {
+  a: undefiend
+}
+
+myObject.a // undefiend;
+myObject.b // undefiend
+```
+
+这时我们可以看出，如myObject.a的属性访问返回值可能是undefined，但是这个值有可能是属性中存储的undefined，也可能是因为属性不存在所以返回undefined，那么怎么区别这两种对象呢？
+
+```javascript
+var myObject = {
+  a: 2
+}
+
+('a' in myObject);  // true
+('b' in myObject);  // false
+
+myObject.hasOwnProperty("a");  // true;
+myObject.hasOwnProperty("b");  // false
+```
+
+in操作符会检查属性是否在对象及其[[property]]原型链中，相比之下，hasOwnProperty(...)只会检查属性是否在myObject对象中，不会检查[[property]]链。
+
