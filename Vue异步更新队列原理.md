@@ -174,4 +174,149 @@ export function withMacroTask(fn: Function): Function {
 
 OK，这就要从我们文章开头所说的第二部分EventLoop讲起了。
 
-其实这部分内容相信对已经看到这里的您来说早就接触过了，如果还真的不太清楚的话推荐您看下阮一峰老师的[这篇文章](http://www.ruanyifeng.com/blog/2014/10/event-loop.html)
+其实这部分内容相信对已经看到这里的您来说早就接触过了，如果还真的不太清楚的话推荐您看下阮一峰老师的[这篇文章](http://www.ruanyifeng.com/blog/2014/10/event-loop.html)，我们只会大概的做一个总结：
+
+1. 我们的同步任务的调用形成了一个栈结构。
+2. 除此之外我们还有一个任务队列，当一个异步任务有了结果后会向队列中添加一个任务，每个任务都对应着一个回调函数。
+3. 当我们的栈结构为空时，就会读取任务队列，同时调用其对应的回调函数。
+4. 重复。
+
+这个总结目前来说对于我们比较欠缺的信息就是队列中的任务其实是分为两种的，宏任务（macrotask）与微任务（microtask）。当主线程上执行的所有同步任务结束后会从任务队列中抽取出所有微任务执行，当微任务也执行完毕后一轮事件循环就结束了，然后浏览器会重新渲染（请谨记这一点，因为正是此原因才会导致文章开头所说的闪动问题）。之后再从队列中取出宏任务继续下一轮的事件循环，值的注意的一点是执行微任务时仍然可以继续产生微任务在本轮事件循环中不停的执行。所以本质上微任务的优先级是高于宏任务的。
+
+如果你想更详细的了解宏任务和微任务那么推荐您阅读[这篇文章](https://jakearchibald.com/2015/tasks-microtasks-queues-and-schedules/?utm_source=html5weekly)，这或许是东半球关于这个问题解释的最好，最易懂，最详细的文章了。
+
+宏任务和微任务产生的方式并不相同，浏览器环境下setImmediate，MessageChannel，setTimeout会产生宏任务，而MutationObserver，Promise则会产生微任务。而这也是Vue中采取的异步方式，Vue会根据useMacrotask的布尔值来判断是要产生宏任务还是产生微任务来异步更新队列，我们会稍后看到这部分，现在我们还是走回我们原来的逻辑吧。
+
+当fn在withMacroTask函数中被调用后就产生了我们以上所讲的所有步骤，现在是时候来真正看下nextTick函数都干了什么：
+
+```javascript
+export function nextTick(cb?: Function, ctx?: Object){
+    let _resolve;
+    // callbacks为一个数组，此处将cb推进数组，本例中此cb为刚才还未执行的flushSchedulerQueue
+    callbacks.push(() => {
+        if(cb){
+            try{
+                cb.call(ctx);
+            } catch(e){
+                handleError(e, ctx, 'nextTick');
+            }
+        } else if(_resolve){
+            _resolve(ctx);
+        }
+    });
+    // 标记位，保证之后如果有this.$nextTick之类的操作不会再次执行以下代码
+    if(!pending){
+        pending = true;
+        // 用微任务还是用宏任务，此例中运行到现在为止Vue的选择是用宏任务
+        // 其实我们可以理解成所有用v-on绑定事件所直接产生的数据变化都是采用宏任务的方式
+        // 因为我们绑定的回调都经过了withMacroTask的包装，withMacroTask中会使useMacrotask为true
+        if(useMacroTask){
+            macroTimeFunc();
+        } else {
+            microTimeFunc();
+        }
+    }
+    // $flow-disable-line
+    if(!cb && typeof Promise !== 'undefined'){
+        return new Promise(resolve => {
+            _resolve = resolve;
+        });
+    }
+}
+```
+
+执行完以上代码最后只剩下两个结果，调用macroTimerFunc或者microTimerFunc，本例中到目前为止，会调用macroTimerFunc。这两个函数的目的其实都是要以异步的形式去遍历callbacks中的函数，只不过就像我们上文所说的，他们采取的方式并不一样，一个是宏任务达到异步，一个是微任务达到异步。另外我要适时的提醒你引起以上所有流程的原因只是运行了一行代码this.show = false而this.$nextTick(() => {this.show = true})还没开始执行，不过别绝望，也快轮到它了。好的，回到正题来看看macroTimerFunc与microTimerFunc吧。
+
+```javascript
+/**
+  * macroTimerFunc
+  */
+// 如果当前环境支持setImmediate，就用此来产生宏任务达到异步效果
+if(typeof setImmediate !== 'undefined' && isNative(setImmediate)){
+    macroTimerFunc = () => {
+        setImmediate(flushCallbacks);
+    }
+} else if(typeof MessageChannel !== 'undefined' && (
+	// 否则MessageChannel
+    isNative(MessageChannel) || 
+    // PhantomJS
+    MessageChannel.toString() === '[object MessageChannnelConstructor]'
+)){
+    const channel = new MessageChanner();
+    const port = channel.port2;
+    channel.port1.onmessage = flushCallbacks;
+    macroTimerFunc = () => {
+        port.postMessage(1);
+    };
+} else {
+    // 再不行的话就只能setTimeout了
+    /* istanbul ignore next */
+    macroTimerFunc = () => {
+        setTimeout(flushCallbacks, 0);
+    }
+}
+```
+
+```javascript
+/**
+  * microTimerFunc
+  */
+// 如果支持Promise则用Promise来产生微任务
+if(typeof Promise !== 'undefined' && isNative(Promise)){
+    const p = Promise.resolve();
+    microTimerFunc = () => {
+        p.then(flushCallbacks);
+        // 对IOS做兼容性处理，（IOS中存在一些问题，具体可以看尤大大自己的解释）
+        if(isIOS) setTimeout(noop);
+    }
+} else {
+    // 降级
+    microTimerFunc = macroTimerFunc;
+}
+```
+
+截止到目前为止应该有一个比较清晰的认识了，其实nextTick最终希望达到的效果就是采用异步的方式去调用flushCallbacks，至于使用宏任务还是微任务，Vue内部已经帮我们处理掉了，并不用我们去决定。至于flushCallbacks光看名字就知道是循环刚才的callbacks并执行。
+
+```javascript
+function flushCallbacks(){
+    pending = flase;
+    // 将callbacks做一次复制
+    const copies = callbacks.slice(0);
+    // 置空callbacks
+    callbacks.length = 0;
+    // 遍历并执行
+    for(let i = 0; i < copies.length; i++){
+        copies[i]();
+    }
+}
+```
+
+请注意，虽然我们在这里解释了flushCallbacks是干嘛的，但是要记住它是被异步处理的，而当前同步任务还并没有执行完，所以这个函数此时并没有被调用，真正要做的是走完整个同步任务，也就是我们的this.$nextTick(() => {this.show = true})终于要被调用了，感谢老天爷。当this.\$nextTick被调用后() => {this.show = true}同样被当作参数推入了callbacks中，此时可以理解为callbacks长这样[flushSchedulerQueue, () => { this.show = true }] ，然后再withMacroTask中fn.apply调用完毕useMacrotask被变回false，整个同步任务结束。
+
+此时还记得我们在EventLoop中所讲的吗，我们会从任务队列中寻找所有的微任务，而到目前为止任务队列中并没有微任务，于是一轮事件循环完成了，浏览器重新渲染，不过此时我们的dom结构没有发生丝毫变化，所以就算浏览器没重新渲染也并不会有丝毫影响。接下来就是执行任务队列中的宏任务了，它对应的回调就是我们刚才注册的flushCallbacks。首先执行flushSchedulerQueue，其中的watcher被调用了run方法，由于此时我们的data中的show被改变成了false，所以新老虚拟的dom对比后真实dom中移除掉了绑定v-if="show"的组件。
+
+重点来了，虽然dom中移除掉了该组件，但是其实在浏览器上这个组件是依然显示的，因为我们的事件循环还没有完成，其中还有剩余的同步任务需要被执行，浏览器并没有开始重新绘制。（如果您对此段还有疑问，我个人觉得您可能还是没有搞懂dom与浏览器上显示的区别，您可以将dom理解成控制台中elements模块内所有的节点，浏览器的中显示的内容不是与其时刻保持一致的）。
+
+剩下需要被执行的就是() => { this.show = true }，而当执行this.show = true时我们前文所有的流程又通通执行了一遍，其中只有一些细节是与刚才不同的，我们来看一下。
+
+1. 此函数并没有被withMacroTask包装，它是callbacks被flush时被调用的，所以useMacrotask并没有被改变依然是其默认值false。
+2. 由于第一点原因我们在这次执行宏任务macrotask时产生了微任务microtask来处理本次的flushCallbacks（也就是调用了microTimerFunc）。
+
+所以当本次macrotask结束时，本次的事件循环还没有结束，我们还留下了微任务需要处理，依然是调用flushSchedulerQueue，然后watcher.run，因为此次show已经为true了，所以对比新老虚拟dom，重新生成该组件，生命周期完成重置。此时，本轮事件循环结束，浏览器重新渲染。希望您还记得，我们的浏览器本身现在的状态就是该组件显示在可视区内，重新渲染后该组件依然显示，所以自然不会出现组件闪动的情况。
+
+现在我相信您自己也能像清楚为什么我们的例子中使用setTimeout会有闪动，但是我还是说一下原因来看下一您与我的想法是否一致。因为setTimeout产生的是宏任务，当一轮事件循环完成后，宏任务并不会直接处理，中间插入了浏览器的绘制。浏览器重新绘制后会将显示的组件移除掉，所以区域内出现一片空白，紧接着下一次事件循环开始，宏任务被执行组件dom又被重新创建，事件循环结束，浏览器重绘，又在可视区域上将盖组件显示。所以在您的视觉效果上，该组件会有闪动，整个过程结束。
+
+终于我们说的都说完了，如果您能坚持看到这里，十分感谢您。不过还有几点是我们依然要考虑的。
+
+1. Vue干嘛要使用异步队列更新，这明明很麻烦又很绕。
+
+其实文档已经告诉我们了：
+
+> 这种在缓冲时去除重复数据对于避免不必要的计算和DOM操作上非常重要。
+
+我们假设flushSchedulerQueue并没有通过nextTick而是直接被调用，那么第一种写法this.show = false; this.show = true都会触发watcher.run方法，导致的结果就是这种写法也可以重置组件的生命周期，您可以在Vue源码中注释掉nextTick(flushSchedulerQueue)改用flushSchedulerQueue()打断点来更加明确的体验一下流程。要知道这仅仅是一个简单的例子，实际工作中我们可能因为这种问题使dom白白被改变了几百次，我们都知道dom的操作是昂贵的，所以Vue帮我们在框架内优化了该步骤。您不妨再想一下直接flushSchedulerQueue()这种情况，组件会不会闪动，来巩固我们刚才讲过的东西。
+
+2. 既然nextTick使用的微任务时由Promise.then().resolve()生成的，我们可不可以直接在回调函数中写this.show = false; Promise.then().resolve(() => { this.show = true })来代替this.$nextTick？很明显我既然这样问了那就是不行的，只是过程您需要自己思考。
+
+
+
