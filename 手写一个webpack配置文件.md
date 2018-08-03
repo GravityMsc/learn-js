@@ -89,3 +89,63 @@ module.exports = {
 # 一、前端环境搭建
 
 我们使用npm或yarn来安装webpack
+
+```bash
+npm install webpack webpack-cli -g 
+# 或者 
+yarn global add webpack webpack-cli
+```
+
+为什么webpack会分为两个文件呢？在webpack3中，webpack本身和它的cli以前都是在同一个包中，但在第3版中，他们已经将两者分开来更好地管理它们。
+
+新建一个webpack的文件夹，在其他新建一个try-webpack（防止init时项目名和安装包同名）并初始化和配置webpack。
+
+```bash
+ npm init -y  //-y 默认所有的配置
+ yarn add webpack webpack-cli -D  //-D webpack安装在devDependencies环境中
+```
+
+# 二、部署webpack
+
+在上面搭建好的环境项目中，我们来到package.json里配置我们的scripts：
+
+```json
+  "scripts": {
+    "build": "webpack --mode production" //我们在这里配置，就可以使用npm run build 启动我们的webpack
+  },
+  "devDependencies": {
+    "webpack": "^4.16.0",
+    "webpack-cli": "^3.0.8"
+  }
+```
+
+配置好我们webpack的运行环境时，联想下vue-cli。平时使用vue-cli会自动帮我们配置并生成项目。我们在src下进行项目的开发，最后npm run build打包生成我们的dist目录。
+
+# 三、npm run build发生了什么
+
+在我们的根项目下try-webpack新建一个src目录。在src目下新建一个index.js文件，在这个文件里面我们可以写任意的代码。写完之后我们在终端运行我们的命令npm run build；你就会发现新增了一个dist目录，里面存放着webpack打包好的main.js文件。
+
+# 四、webpack配置流程篇
+
+我们在开发时一般会打包什么文件呢？我们可以回忆一下，其实vue-cli项目src下就以下几点：
+
+* 发布时需要的html，css，js
+* css预编译器stylus，less，sass
+* es6的高级语法
+* 图片资源.png，.gif，.ico，.jpg
+* 文件之间的require
+* 别名@等修饰符
+
+那么我将会分这几点来讲解webpack中webpack.config.js的配置。
+
+## HTML在webpack中的配置
+
+在项目的根目录try-webpack下新建webpack.config.js文件，以CommonJS模块化机制向外输出，并且新建一个index.html。
+
+配置我们的入口entry（在vue-cli里相当于根目录下的main.js）和我们的出口output。我们可以把webpack理解为一个工厂，进入相当于把各种各样的原料放进我们的工厂了，然后工厂进行一系列的打包操作把打包好的东西向外输出。
+
+```javascript
+const path = require('path');	// 引入我们的node模块里的path
+// 测试下 const.log(path.resolve(__dirname, 'dist'));	// 物理地址
+```
+
