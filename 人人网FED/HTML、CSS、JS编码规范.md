@@ -580,3 +580,356 @@ JS也是同样的道理，可以不用type，如下代码：
 
 这了能比你直接套一个类强。但是不管怎么样，不能滥用，合适的时候才使用，而不是仅仅为了少写类名。
 
+### 7、减少覆盖
+
+覆盖是一种常用的策略，也是一种不太优雅的方式，如下代码，为了让每个house中间有20px的间距，但是第一个house不要有间距：
+
+```css
+.house{
+    margin-top: 20px;
+}
+.house:first-child{
+    margin-top: 0;
+}
+```
+
+其实可以改成这样：
+
+```css
+.house + .house{
+    margin-top: 20px;
+}
+```
+
+只有前面有.house的.house才能命中这个选择器，由于第一个.house前面没有，所以不会命中，这样看起来代码就简洁多了。
+
+还有这种情况，如下代码所示：
+
+```css
+.request-demo input{
+    border: 1px solid #282828;
+}
+.request-demo input[type=submit]{
+    border: none;
+}
+```
+
+其实可以借助一个:not选择器：
+
+```css
+.request-demo input:not([type=sbumit]){
+    border: 1px solid #282828;
+}
+```
+
+这样看起来代码也优雅了很多。
+
+有一种覆盖是值得的，那就是响应式里面小屏的样式覆盖大屏，如下：
+
+```css
+.container{
+    width: 1080px;
+    margin: 0 auto;
+}
+@media (min-width: 1024px){
+    .container{
+        width: auto;
+        margin: 0 40px;
+    }
+}
+```
+
+大屏的样式也可以写成：
+
+```css
+@media (min-width: 1025px){
+     .container{
+         width: 1080px;
+         margin: 0 auto;
+    }
+}
+```
+
+我一开始也是这么写的，为了遵循较少覆盖原则，但是后来发现这种实践不好，代码容易乱，写成覆盖的好处在于可以在浏览器明显地看到，小屏的样式是覆盖了哪个大屏的样式，这个在大屏的时候又是怎么样的。
+
+### 8、使用CSS3的选择器完成一些高级的功能
+
+上面提到:not可以让代码简洁，还有其他一些很好用的高级功能。例如说只有两个li的时候一个li占比50%，而有3个li的时候一个li占比33%，这个用CSS就可以实现，如下：
+
+```css
+.listing-list li{
+    width: 33%;
+}
+.listing-list li:first-child:nth-last-child(2),
+.listing-list li:first-child:nth-last-child(2) ~ li{
+     width: 50%;
+}
+```
+
+当li是第一个元素并且是倒数第二个元素的时候以及和它相邻的li被第二组选择器命中，它的宽度是50%，也就是只有两个li的时候才能满足这个条件。
+
+另外还可以借用:hover/:focus/:invalid/:disabled等伪类选择器完成一些简单的交互。
+
+### 9、少用!important
+
+important用来覆盖属性，特别是爱CSS里面用来覆盖style里面的属性，但是import还是少用为妙。有时候你为了偷懒直接写个！important，以为这个的优先级是最高的了，往往螳螂捕蝉黄雀在后，很可能过不了多久又要再写一个优先级更高的覆盖掉，这样就略显尴尬了。所以能少用还是少用。如果要覆盖还是先通过增加选择器权重的方式。
+
+### 10、多写注释
+
+“程序员最讨厌的两件事：第一是给自己的代码写文档，第二则是别人的代码没有写文档”。注释也是同样道理，当看到很多绿色的注释代码神经会比较放松，而当看到揉成一团还是没有注释的代码时比较压抑的。
+
+CSS的注释可包括：
+
+#### （1）文件顶部的注释
+
+```javascript
+/*
+ * @description整个列表页样式入口文件
+ * @author yincheng.li
+ */
+```
+
+#### （2）模块的注释
+
+```javascript
+/*详情页贷款计算器*/
+```
+
+#### （3）简单注释
+
+```css
+/*为了去除输入框和表单点击时的灰色背景*/
+input, 
+form{
+    -webkit-tap-highlight-color:  rgba(255, 255, 255, 0);
+}
+```
+
+#### （4）TODO的注释
+
+有时候你看源码的时候你会看到一些TODO的注释：
+
+```javascript
+/* TODO(littledan): Computed properties don't work yet in nosnap.
+   Rephrase when they do.
+*/
+```
+
+表示这些代码还有待完善，或者有些缺陷需要以后修复。而这种TODO的注释一般编辑器会把TODO高亮。
+
+注意不要写一些错误的误导性注释或者比较废话的注释，这种还不如不写，如下：
+
+```css
+/* 标题的字号要大一点 */
+.listings h2{
+    font-size: 20px;
+}
+```
+
+### 11、排版规范
+
+不管是JS/CSS，缩进都调成4个空格，如果你用的sublime，在软件的右下角有一个Tab Size，选择Tab Size 4，然后再把最上面的Indent Using Spaces勾上，这样，当你打一个tab键缩进的时候就会自动转换成4个空格。如果你使用vim，新增或者编辑~/.vimrc文件新怎一行：
+
+```bash
+:set tabstop=4
+```
+
+也会自动把缩进改成4个空格，其他编辑器自行查找设置方法。因为\t在不同的编辑器上显示长度不一样，而改成空格可以在不同人的电脑上格式保持一致。
+
+多个选择器共用一个样式集，每个选择器要各占一行，如下：
+
+```css
+.landing-pop,
+.samll-pop-outer,
+.signup-success{   
+    display: none;
+}
+```
+
+每个属性名字冒号后面要带个空格，~、>、+选择区的前后也要带一个空格：
+
+```css
+.listings > li{
+    float: left;
+}
+```
+
+### 12、属性值规范
+
+#### （1）如果值是0，通常都不用带单位
+
+例如：
+
+```css
+.list{
+    border: 1px solid 0px;
+    margin: 0px;
+}
+```
+
+应改成：
+
+```css
+.list{
+    border: 1px solid 0;
+    margin: 0;
+}
+```
+
+但是有个特例，就是和时间有关的时间单位都要带上秒s，如下两个都是不合法的：
+
+```css
+transition-duration: 0;
+transition: transform 0 linear;
+```
+
+#### （2）颜色值用十六进制，少用rgb
+
+如下：
+
+```css
+color: rgb(80, 80, 80);
+```
+
+应该改成：
+
+```css
+color: #505050;
+```
+
+因为使用rgb是一个函数，它还要计算一下转换。如果是带有透明度的再用rgba。
+
+如果颜色值的六个字符一样，那么写3个就好：
+
+```css
+color: #ccc;
+```
+
+#### （3）注意border none和0的区别
+
+如下两个意思一样：
+
+```css
+border: 0;
+border-width: 0;
+```
+
+而下面这两个一样：
+
+```css
+border: none;
+border-style: none;
+```
+
+所以用0和none都可以去掉边框。
+
+你可能会说打包工具其实最好会帮我们处理，但自己也要保持一个良好的书写习惯。
+
+### 13、font-family的设置
+
+注意使用系统字体的对应的font-family名称，如SFUIText Font这个字体，在Safari是-apple-system，而在Chrome是BinkMacSystemFont，所以font-family可以这么写：
+
+```css
+font-family{
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+}
+```
+
+再如微软雅黑，很多中文网站都用这个字体，要写成：
+
+```css
+.title{
+    font-family: Lato Bold;
+}
+```
+
+因为如果你在代码里面写了好多个font-family，到时候要整体替换网页的字体就很麻烦了，正确的做法应该是这样的：
+
+```css
+h1,
+strong,
+b{
+    font-family: Lato Bold;
+    font-weight: normal;
+}
+```
+
+如果需要加粗就用标题标签，或者b/strong标签，并且要把font-weight调回来，因为那个字体本身就有加粗效果了，如果font-family再是粗体的话浏览器会用自己的算法继续加粗，如果是细体怎么办，一方面一般细体用得比较少，另一方面没有细体的标签，可以通过嵌套类的方式。
+
+###14、不要设置太大的z-index
+
+有些人喜欢设置z-index很大：
+
+```css
+z-index: 99999;
+```
+
+以为他是老大 ，不会有人再比他高了，但是螳螂捕蝉，黄雀在后，很快得再写一个：
+
+```css
+z-index: 999999;
+```
+
+通常自己页面的业务逻辑的z-index应该保持在个位数就好了。
+
+### 15、合并属性
+
+一般的说法是为了提高性能，属性要合并，但其实Chrome每个属性都是单独的，就算你合在一起，它也会帮你拆出来，如把margin拆成left/right/top/bottom，但是我们还是推荐写成合在一起的，因为它可以让代码看起来更简洁，代码量更少，如下代码：
+
+```css
+.container{
+    margin-top: 20px;
+    margin-left: 10px;
+    margin-right: 10px;
+}
+```
+
+可以写成：
+
+```css
+.container{
+    margin: 20px 10px 0;
+}
+```
+
+但是合在一起写了，要注意别覆盖了其他的设置，如上面把margin-bottom设置成了0.
+
+再如：
+
+```css
+.banner{
+    background-image: url(/test.jpg);
+    background-position: 0 0;
+    background-repeat: no-repeat;
+}
+```
+
+可以改成：
+
+```css
+.banner{
+    background: url(test.jpg) 0 0 no-repeat;
+}
+```
+
+### 16、注意float/absolute/fixed定位和UI强制设置成block
+
+如下代码：
+
+```css
+a.btn {
+    float: left;
+    display: block;
+    width: 100px;
+    height: 30px;
+}
+```
+
+第二行的display: block其实是没用的，因为如果你浮动了，目标元素就会具有块级盒模型的特性。即使你display: table-cell或者inline也不管用。如果你是display: flex，那么float将会被忽略。
+
+同样地，absolute定位和fixed定位也有同样的效果，会把行内元素变成块级的。
+
+### 17、清除浮动
+
+清除浮动有很多种方法，一般用clearfix大法，虽然这个方法有缺陷，但是它比较简单且能够适用绝大多数的场景，一个兼容IE8及以上的clearfix的写法
+
