@@ -931,5 +931,191 @@ a.btn {
 
 ### 17、清除浮动
 
-清除浮动有很多种方法，一般用clearfix大法，虽然这个方法有缺陷，但是它比较简单且能够适用绝大多数的场景，一个兼容IE8及以上的clearfix的写法
+清除浮动有很多种方法，一般用clearfix大法，虽然这个方法有缺陷，但是它比较简单且能够适用绝大多数的场景，一个兼容IE8及以上的clearfix的写法：
+
+```css
+.clearfix:after{
+    content: "";
+    display: table;
+    clear: both;
+}
+```
+
+就不要在末尾添加一个多余元素的方法清除浮动了，虽然也可行，但是比较low。
+
+###18、引号的使用
+
+#### （1）font-family
+
+一般来说font-family不需要添加引号，即使字体名称带有空格也没关系，但是有一种情况是一定要加上引号的，就是字体名称刚好是关键词，如下字体都需要加关键词：
+
+```css
+font-family: "inherit", "serif", "sans-serif", "monospace", "fantasy", and "cursive"
+```
+
+#### （2）background的url
+
+```css
+background-url: url("//cdn.test.me/test.jpg");
+```
+
+你不加也可以，但是有一种一定要加，那就是url里面带有特殊字符没有转义，如下：
+
+```css
+background-url: url(//cdn.test.me/hello world.jpg)
+```
+
+上面的情况浏览器会去加载//cdn.test.me/hello，然后报404。这种情况通常是图片是用户上传的，图片的名字带有空格，后端给的url没有对特殊字符做处理，就会有问题，所以当url是可变的时候，最好还是带上引号：
+
+```css
+background-url: url('//cdn.test.me/hello world.jpg');
+```
+
+这样浏览器就能正常加载图片了。这种情况最好还是从源头上避免，但我们也可以做个兼容。
+
+#### （3）单引号还是双引号
+
+这两个都是合法的，只是统一一下比较好，不能一下子单引号，一下子双引号的，比较普遍的推荐是html使用双引号，css使用单引号。
+
+### 19、CSS动画规范
+
+#### （1）不要使用all属性做动画
+
+使用transition做动画的时候不要使用all属性，在有一些浏览器上面可能会有一些问题，如下：
+
+```css
+transition: all 2s linear;
+```
+
+在Safari上面可能会有一些奇怪的抖动，正确的做法是要用哪个属性做动画就写哪个，如果有多个就用逗号隔开，如下代码所示：
+
+```css
+transition: transform 2s linear,
+             opacity 2s linear;
+```
+
+#### （2）使用transform替代position做动画
+
+如果能用transform做动画的，就不会使用left/top/margin等，因为transform不会造成重绘，性能要比position那些高很多，特别是在移动端的时候效果比较明显。基本上位移的动画都能用transform完成，不需要使用CSS2的属性，如一个框从右到左弹出。
+
+#### （3）偏向于使用CSS动画替代JS动画
+
+例如把一个框，从下到上弹出，可以用jQuery的slideUp函数，或者自己写setInterval函数处理，但是这些没有比用CSS来得好。使用CSS，初始状态可以把框translate移动到屏幕外，然后点击的时候加上一个类，这个类的transform值为0，然后再用transition做动画就好了。
+
+### 20、不要断词
+
+英文的单词或者数字如果当前行排不下会自动切到下一行，这样就导致每行长短不一，有时候可能不太美观，但是不能使用word-break:break-all把一个单词拆成两行，还有一种是使用：
+
+```css
+hyphens: auto;
+```
+
+它会把单词拆成用 - 连接的形式，看起来好像挺合理，但是由于它断词断得不够彻底，有些单词断不了，长短不一的现象看起来比较明显，有些单词还被拆成了两行，所以还不如不加。
+
+### 21、不要设置图标字体font-family
+
+这个和上面提到的font-family设置是一样的，不要在代码里面手动设置font-family，如下：
+
+```css
+.icon-up:before{
+    content: "\e950";
+    font-family: "icon-font";
+}
+```
+
+正确的做法是给.icon-up的元素再套一个.icon的类，font-family等对图标字体的相关设置都统一在这个类里面：
+
+```css
+.icon{
+    font-family: "icon-font";
+    /* Better Font Rendering =========== */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+```
+
+因为我们可能会添加其他一些设置，有个.icon的类统一处理比较好。就不要手动一个个去设置font-family 了。
+
+### 22、设置常见样式reset
+
+由于每个浏览器都有自己的UA样式，并且这些样式还不太统一，所以需要做样式reset，常见的reset有以下：
+
+```css
+/* IE浏览器对输入控件有自己的font-family，需要统一 */
+input,
+textarea,
+button{
+    font-family: inherit;
+}
+
+/* Chrome浏览器会在输入控制聚集的时候添加一个蓝色的outline*/
+input:focus,
+textarea:focus,
+select:focus{
+    outline: none;
+}
+
+/* 去掉textarea的可拉大小功能*/
+textarea{
+    resize: none;
+}
+
+/* IOS Safari在横屏的时候会放大字体，第二个属性让滑动更流畅 */
+html{
+    -webkit-text-size-adjust: 100%;
+    -webkit-overflow-scrolling : touch;
+}
+
+/* 统一标签的margin值和p标签的line-height*/
+body, p, h1, h2, ul, ol, figure, li{
+    padding: 0;
+    margin: 0;
+}
+
+h1, h2, p{
+    line-height: 150%;
+}
+
+/* 去掉select的默认样式 */
+select{
+    -webkit-appearance: none;
+}
+/* 如果有输入内容IE会给输入框右边加一个大大的X */
+input::-ms-clear{
+    display: none;
+    width: 0;
+    height: 0;
+}
+
+/* 去掉number输入框右边点击上下的小三角 */
+input::-webkit-inner-spin-button{
+    -webkit-appearance: none;
+}
+
+input::-webki-outer-spin-button{
+    -webki-appearance: none;
+}
+```
+
+### 23、图片压缩
+
+不管是UI直接给的图片还是自己从UI图里切出来的图片，都需要把图片压缩一下，建议使用tinypng，它可以在保持图片质量减少较低的情况下，把图片压得很厉害，比直接在PS里面设置压缩质量要强。如果是色彩比较丰富的图片要使用jpg格式，不能使用png格式，png会大得多，如果是logo那种矢量图片，直接使用svg格式即可。一般来说要把图片控制在300k以内，特别是banner头图，图片的大小也要控制住。
+
+### 24、正确使用background和img
+
+显示一张图片有两种方式，可以通过设置CSS的background-image，或者是使用img标签，究竟什么时候用哪种呢？
+
+如果是头图等直接展示的图片还是要img标签，如果是作为背景图就使用background，因为使用img可以写个alt属性增强SEO，而背景图那种本身不需要SEO。虽然background有一个background-position:center center很好，但是头图那种还是使用img吧，自己去居中，不然做不了SEO。
+
+### 25、响应式的规范
+
+响应式开发最好不要杂合使用rem，文字字号要么全部使用rem，要么不要用，也不要使用transform: scale去缩小，因为被缩小的字号看起来有点奇怪，别人都是14px，而你变成了13.231px，小了一点。响应式的原则一般是保持中间或者两边间距不变， 然后缩小主题内容的宽度。
+
+### 26、适当使用:before/:after
+
+:before和:after可以用来画页面的一些视觉上的辅助性元素，如三角形、短的分割线、短竖线等，可以减少页面上没有用的标签。但是页面上正常的文本等元素还是不要用before/after画了。
+
+### 27、少用absolute定位
+
+首先absolute定位的元素渲染性能会比较高，因为它独立出来了，计算量会少，用得好还是可以的。但是如果你页面的主要布局是使用absolute的话那肯定是不可取的，因为absolute定位的可扩展性很差，你把每个元素的位置都定死了就变不了，可以多用float，虽然float的性能相对较差，但是不管是实用性还是兼容性都是挺好的。
 
