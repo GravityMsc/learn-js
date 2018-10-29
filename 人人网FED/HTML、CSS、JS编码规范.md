@@ -1119,3 +1119,273 @@ input::-webki-outer-spin-button{
 
 首先absolute定位的元素渲染性能会比较高，因为它独立出来了，计算量会少，用得好还是可以的。但是如果你页面的主要布局是使用absolute的话那肯定是不可取的，因为absolute定位的可扩展性很差，你把每个元素的位置都定死了就变不了，可以多用float，虽然float的性能相对较差，但是不管是实用性还是兼容性都是挺好的。
 
+### 28、少用inline-block布局
+
+有些人喜欢用inline-block，特别是刚开始学切图的人，因为block会换行，而inline-block不会换行还具有盒模型，因此inline-block用得很顺手，而float比较复杂，还要处理清除浮动之类的问题。如下布局：
+
+![布局示例](https://user-gold-cdn.xitu.io/2017/8/24/aee9ad1dcccd07450fdbe162016787c9?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+应该写li，然后让li float，如果你让li display: inline-block也可以达到目的。但是inline-block用得多了可能会有一些奇怪的问题，你通常要在一个inline-block的元素里面套blcok的元素，inline-block是行内元素，而block是块级元素，这两者终究有点差别。这种应该用float/flex会更自然，如果你float用顺手了你会发现比inline-block好多了，并且更加专业。如果你没怎么用过flex，那你可以尝试换一下使用flex，如果你没怎么用过float，可以尝试用一下。只有你的切图方式多样化了，你切起图来才能比较灵活。
+
+### 29、图片的居中和宽高设定
+
+一般来说，UI给的图片展示宽高是固定的，但是实际的图片长宽是不固定的，大部分图片是长比宽大，小部分图片是宽比长大。所以需要居中裁剪展示，如下图所示：
+
+![图片的居中设定](https://user-gold-cdn.xitu.io/2017/8/24/acf6012ed81d26f3e8cc2233617ad30a?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+中间黑色的框是展示区域，图片的短边和窗口的短边一样大，另一边按照图片的原始比例拉伸，然后居中显示。这个得借助JS，因为图片未加载好之前，不知道是长边比较大还是宽边比较大。如下代码：
+
+```html
+<div class="img-container">
+    <img src="test.jpg" alt onload="resizeImg(this, '400px', '300px'">
+</div>
+```
+
+借助一个resizeImg函数，在onload函数里面做处理。然后居中用CSS：
+
+```css
+.img-container{
+    position: relative;
+    width: 400px;
+    height: 300px;
+}
+.img-container img{
+    position: absolute;
+    left: -9999px;
+    right: -9999px;
+    top: -9999px;
+    bottom: -9999px;
+    margin: auto;
+}
+```
+
+上面代码用了一个margin: auto做居中。
+
+### 30、移动端提高可点区域范围
+
+移动端的一些图标比如X，可能会设计的比较小，所以点起来会不太好点，因此要提高可点击区域的范围，可通过增加padding，如下代码：
+
+```css
+.icon-close{
+    position: abosulte;
+    right: 0;
+    top: 0;
+    padding: 20px;
+}
+```
+
+这样区域就增加了一圈，点击起来就容易多了。
+
+### 31、不要设置input的line-height
+
+如果设置input的line-height，如下代码，你可能要做垂直居中：
+
+```css
+.request-demo input{
+    height: 40px;
+    line-height: 40px;
+}
+```
+
+设置了line-height为一个很高的值，这样会导致Safari浏览器的输入光标变得巨大，所以如果你要居中的话，使用padding吧。
+
+### 32、移动端弹框要禁止body滑动
+
+因为IOS Safari切换输入框的时候页面会弹闪得很厉害，因为你在切的时候它会先把键盘收起来，然后再弹出来，这个时间很短，给人感觉页面弹闪了一下，但如果把body禁止滑动了就不会有这个问题，这有两个解决办法，第一种是把body fixed住，第二种设置body overflow: hidden，相对来说第二种比较简单一点。IOS10完全不会闪，IOS9以下还是会闪。
+
+### 33、对于渐变的处理
+
+有时候UI里面会有一些渐变的效果，无法复制CSS出来，这个时候可以用一个在线的工具，生成渐变的CSS：https://www.cssmatic.com/gradient-generator#，但是这个需要自己手动调一个和UI一模一样的效果，或者可以直接给UI调一个它理想的效果，它会生成兼容性很强的CSS：
+
+```css
+background: #fff;
+background: -moz-linear-gradient(left, #fff 0%, #d2d2d2 43%, #d1d1d1 58%, #fefefe 100%);
+background: -webkit-gradient(left top, right top, color-stop(0%, #fff), color-stop(43%, #d2d2d2), color-stop(58%, #d1d1d1), color-stop(100%, #fefefe));
+background: -webkit-linear-gradient(left, #fff 0%, #d2d2d2 43%, #d1d1d1 58%, #fefefe 100%);
+background: -o-linear-gradient(left, #fff 0%, #d2d2d2 43%, #d1d1d1 58%, #fefefe 100%);
+background: -ms-linear-gradient(left, #fff 0%, #d2d2d2 43%, #d1d1d1 58%, #fefefe 100%);
+background: linear-gradient(to right, #fff 0%, #d2d2d2 43%, #d1d1d1 58%, #fefefe 100%);
+filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#fff', endColorstr='#fefefe', GradientType=1 );
+```
+
+### 34、行内元素可以直接设置margin-left/margin-right
+
+如下有些人为了把span撑开，设置span display: inline-block:
+
+```css
+span.phone-numer{
+    margin-left: 10px;
+}
+```
+
+其实行内元素可直接margin的左右，就能够把它撑开，不需要设置inline-block：
+
+```css
+span.phone-numer{
+    margin-left: 10px;
+}
+```
+
+另外需要注意的是img/input/textarea/button默认就是inline-block，也不用再设置。
+
+## 三、JS编码规范
+
+### 1、变量命名
+
+《代码大全》这本书里面有一章是专门讲变量命名的，这里结合这本书的建议做说明。总的来说，变量名要准确完整地描述该变量所表述的事物，具体来说：
+
+#### （1）变量名不应以短巧为荣
+
+如以下的好的变量名和不好的变量名：
+
+| 不好的变量名       | 好的变量名                   |
+| ------------------ | ---------------------------- |
+| inp                | input, priceInput            |
+| day1, day2, param1 | today, tomorrow              |
+| id                 | userId, orderId              |
+| obj                | orderData, houseInfos        |
+| tId                | removeMsgTimerId             |
+| handler            | submitHandler, searchHandler |
+
+左边的变量名都不太清楚，代码的扩展性不好，一旦代码需要增加功能的话，就容易出现obj1、obj2、obj3这种很抽象的命名方式。所以一开始就要把变量的名字起得真实有意义，不要搞一些很短很通用的名字。
+
+当然变量名取得太长也不太好，如maimumNumberOfTeamMembers。
+
+#### （2）变量名不要使用计算机术语
+
+变量名应直指问题领域，来源于现实世界，而不是计算机世界，例如取了textareaData之类的名字，应该取一个和业务相关的名字，如leaveMsg。
+
+#### （3）变量名的对仗要明确
+
+如up/down、begin/end、opened/closed、visible/invisible、source/target，对仗明确可以让人很清楚地知道两个变量的意义和用途。
+
+#### （4）警惕临时变量
+
+有些喜欢取temp和obj之类的变量，如果这种临时变量在两行代码内就用完了，接下里的代码就不会再用了，还是可以接受的，如交换数组的两个元素。但是有些人取了个temp，接下来十几行代码都用到了这个temp，这个就让人很困惑了。所以应该尽量少用temp类的变量，如下代码：
+
+```javascript
+var temp = 10;
+var leftPosition = currentPosition + temp，
+    topPosition = currentPosition - temp;
+```
+
+应改成：
+
+```javascript
+var adjustSpace = 10;
+var leftPosition = currentPosition + adjustSpace，
+     topPosition = currentPosition - adjustSpace;
+```
+
+#### （5）bool变量
+
+《代码大全》这本书建议布尔变量不用以is/do之类的开头，如下：
+
+```javascript
+var isMobile = true,
+    isError = true,
+    doUpdate = false;
+```
+
+可改成：
+
+```javascript
+var mobile = true,
+    error = true,
+    updated = false;
+```
+
+还有其他一些常用的名称如done/found/success/ok/available/complete等，结合具体的语境：
+
+```javascript
+var ajaxDone = true,
+    fileFound = false,
+    resourceUpdated = true;
+```
+
+另外变量名不要使用否定的名词，如notOK，notReady，因为否定的此取反的时候就会比较奇怪，如if(!notOK)。要使用肯定的布尔变量名，如果是参数的话可结合ES6的默认形参值。
+
+#### （6）变量名使用正确的语法
+
+不要使用中文拼音，如shijianchuo应改成timestamp，如果是复数的话加s，或者加上List，ororderList、menuItems，而过去式的加上ed，如updated/found等，如果正在进行的加上ing，如calling。
+
+### 2、声明变量时要赋值。
+
+如下声明三个变量：
+
+```javascript
+var registerForm,
+     question,
+     calculateResult;
+```
+
+以上绝对是合法JS语法，但是这三个变量的用途会让人比较困惑，特别是中间第二个question，问题是什么。但是当你把上面的变量赋一个初始值的时候：
+
+```javascript
+var registerForm = null,
+     question = "",
+     calculateResult = 0;
+```
+
+就让人豁然开朗了，原来question是一个问题的字符串，而result是一个数字，form是一个对象。这也有利于JS解释器提前做一些优化处理，不用等到使用的时候才知道这些变量是什么类型的。
+
+### 3、函数的返回值类型要确定
+
+如下代码：
+
+```javascript
+function calculatePrice(seatCount){
+    if (seatCount <= 0) {
+        return "";
+    } else {
+        return seatCount * 79;
+    }
+}
+```
+
+这个代码可能返回整型，也有可能返回字符串，就会让人比较困惑，同时从代码性能来说也是不高的，虽然它是合法的JS语法，一个函数的返回类型要统一。你可能会说我用上面的函数作为输入框显示的值，如果是负数或者0，那么输入框就不要显示任何东西，所以才会返回空的字符串。即使是这样的原因也不建议这样写，从长远来看这样写是不利的，你应该用其他的方法组织你的代码。要养成强类型的代码风格，这样不容易出bug，扩展也容易。另外如果一个变量你把它当成数字使用，下面就不要再把它当成字符串使用了，因为这样也容易让人困惑。为让的Typescript就是一种强类型的书写语法，很多大型项目会使用typescript写JS，有兴趣额的可以继续了解怎么写typescript。
+
+### 4、不要给变量赋值undefined
+
+undefined表示一个变量未定义，你定义了一个变量又说它未定义本身就很奇怪。这可能会造成的问题是使用上的歧义，因为我们经常使用undefined来判断变量有没有定义：
+
+```javascript
+if (typeof window.HTMLVideoElement === "undefined")
+```
+
+如果要赋值应该要赋空值，如对象赋值为null，数字赋值为0.字符串赋值为空字符，那你可能会说0也是一个正常的数字，如果赋值为0会导致我误认为它是一个正常的数据，那怎么办呢？如果你的数字都是非负数，那么可以把初始值置为-1，实在不行就置为NaN。
+
+函数的返回值也不要显式地return undefined。
+
+### 5、排版规范
+
+一个比较流行的空格和缩减排版如下代码所示：
+
+```javascript
+//逗号后面带个空格，) {中间带个空格
+function getSeatDiscount(seatCount, currentPrice) {
+    //双目运算符左右两边都带个空格
+    var originPrice = editOrder.getSeatsPrice(seatCount);
+    return Math.round((originPrice - currentPrice) / originPrice * 100);
+}
+```
+
+一行太长要换行，如V8的原名里面一行最长是70个字符，超过就换行：
+
+```javascript
+function ArrayUnshift(arg1) {  // length == 1
+//if判断里面进行了换行，并且if (中间带个空格
+  if (len > 0 && UseSparseVariant(array, len, IS_ARRAY(array), len) &&
+      !%object_is_sealed(array)) {
+    SparseMove(array, 0, 0, len, num_arguments);
+  } else {
+    SimpleMove(array, 0, 0, len, num_arguments);
+  }
+}   
+```
+
+一行代码太长了就换行是一种好的习惯，太长让人看起来比较费劲。基本上一行不要超过100个字符，超过就要换行，不管是注释还是代码。
+
+### 6、使用===代替==
+
+==会带上类型转换，这和上面一样的，我们要用强类型的风格写代码，所以不要使用==，如果有类型转换自己做类型转换，不要让别人去猜这里面有类型转换，使用==会有一些比较奇怪的结果：
