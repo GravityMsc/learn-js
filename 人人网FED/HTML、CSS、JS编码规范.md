@@ -1389,3 +1389,160 @@ function ArrayUnshift(arg1) {  // length == 1
 ### 6、使用===代替==
 
 ==会带上类型转换，这和上面一样的，我们要用强类型的风格写代码，所以不要使用==，如果有类型转换自己做类型转换，不要让别人去猜这里面有类型转换，使用==会有一些比较奇怪的结果：
+
+```javascript
+null == undefined          //true
+'' == '0'                  //false
+0  == ''                   //true
+0  == '0'                  //true
+' \t\r\n ' == 0            //true
+new String("abc") == "abc" //true
+new Boolean(true) == true  //true
+true == 1                  //true
+```
+
+### 7、减少魔数
+
+对一些比较重要的常量起一个名字，例如下面的代码：
+
+```javascript
+const ONE_DATE = 3600 * 24 * 1000;
+var tomorrow = today + ONE_DATE;
+```
+
+再如下面不好的写法：
+
+```javascript
+dialogHandler.showQuestionNaire（"seller", "sell", 5, true）;
+```
+
+上面四个常量会让人看起来比较困惑，如果可以的话给它们起个名字，如果觉得麻烦那就加上注释。
+
+### 8、不要让代码暴露在全局作用域下运行
+
+一个原因是在全局作用域下，变量的查找时间会更长，第二个原因是污染全局作用域，有时候会造成一些意想不到的结果，如下：
+
+```javascript
+var name = "hi boy";
+console.log(window.name);
+```
+
+定义了一个变量，但是刚好不巧window.name是本来就有这个属性，这个属性通常用来跨域传输数据。如果你设置了name这个变量，就把全局的window.name给覆盖了。
+
+### 9、let/var/const的使用
+
+ES6新增了let/const定义变量，使用let有一些好处，如：
+
+#### （1）避免变量重复定义
+
+```javascript
+let me = "go";
+// Uncaught SyntaxError: Identifier 'me' has already been declared
+let me = "go"; 
+```
+
+使用babel loader打包的时候它会做静态检查：
+
+> Module build failed: Duplicate declaration "me"
+
+#### （2）for循环的变量作用域是独立的
+
+```javascript
+for(let i = 0; i <= 4; i++) {
+    tasks.push(function(){
+        console.log("i is " + i);
+    });
+}
+```
+
+使用let使得i在for循环里面每次运行的作用域都是独立的。并且for里定义的变量在for循环外是不可见的。
+
+babel在转换的时候，会在for循环里面套一个function，然后把i当作函数的参数：
+
+```javascript
+var _loop = function _loop(_i) {
+    tasks.push(function () {
+        console.log("i is " + _i);
+    }); 
+};
+
+for (var _i = 0; _i <= 4; _i++) {
+    _loop(_i);
+}
+```
+
+由于let可以避免变量重复定义，就冲着这一点，就使得它很有意义。所以推荐多用let定义变量。所以本规范下面的变量将使用let代替var。
+
+而const适合于给常量起个名字，如上面提到的：
+
+```javascript
+const ONE_DAY = 3600 * 24 * 1000;
+const adjustSpace = 10;
+```
+
+或者是定义其他一些不需要修改的变量，防止不小心被其他代码修改了。
+
+### 10、简洁代码
+
+#### （1）使用三目运算符代替简单的if-else
+
+可以写一行就不要写三行，如下：
+
+```javascript
+let seatDiscount = 100;
+if(seat < 5) {
+    seatDiscount = 90;
+} else if(seat < 10) {
+    seatDiscount = 80;
+} else {
+    seatDiscount = 70;
+}
+```
+
+可以改成三目运算符：
+
+```javascript
+let seatDiscount = seat < 5 ? 90 : 
+                           seat < 10 ? 80 : 70;
+```
+
+代码从8行减少到了2行。
+
+#### （2）使用箭头函数取代简单的函数
+
+例如以下代码：
+
+```javascript
+setTimeout(function(){
+    window.location.reload(true);
+}, 2000);
+```
+
+可改成：
+
+```javascript
+setTimeout(() => window.location.reload(true), 2000);
+```
+
+代码从3行变成了1行。
+
+### 11、注意避免执行过长时间的JS代码
+
+对于一般的页面的数据量来说，加减乘除等计算不足以造成性能瓶颈。容易造成瓶颈的是DOM操作，特别是大批量的DOM操作，只要一次有几百上千的级别就容易造成页面卡顿。特别是不要在一个for循环里不断地修改DOM，如下代码：
+
+```javascript
+for(var i = 0; i < 1000; i++) {
+    ul.appendChild(li);
+}
+```
+
+这种可以先把li拼接好了，再一次性append到ul里面，如下代码：
+
+```javascript
+var fragment = document.createDocumentFragment();
+for(var i = 0; i < 1000; i++) {
+    fragment.appendChild(li);
+}
+ul.appendChild(fragment);
+```
+
