@@ -1546,3 +1546,322 @@ for(var i = 0; i < 1000; i++) {
 ul.appendChild(fragment);
 ```
 
+如果你用jQuery的话应该先把模板渲染好，然后再一次性append到dom里面，而不是不断地append到dom里面。现在的浏览器一般也比较智能，它会做一些优化，但是我们不能老是指望浏览器会优化。
+
+但是还是要注意数据量特别大的情况，你可能要使用setTimeout的方式分段处理数据，甚至使用多线程。使用setTimeout可以这样：
+
+```javascript
+function sliceWorks(data, finishedCallback) {
+    if(!data.length) {
+        finishedCallback();
+    } else {
+        const PIECES = 100;
+        process(data.splice(0, PIECES));
+        setTimeout(() => sliceWorks(data, finishedCallback), 100);
+    }
+}
+```
+
+我们使用一个递归，把数据分段吃力，每段100个，当数据处理完再调完成回调函数。
+
+### 12、多写注释
+
+这个和CSS规范类似
+
+#### （1）文件顶部的注释，包括描述、作者、更新
+
+```javascript
+/*
+ * @file listing-detail.js
+ * @description 房源详情页的JS主文件，处理轮播、房贷计算器、约看房等逻辑
+ * @author yincheng.li
+ * @update (yincheng.li 2017/8/19)
+ */
+```
+
+#### （2）函数的注释
+
+```javascript
+/*
+ * 和搜索界面展示有关的处理逻辑
+ * @namespace
+ */
+
+var searchWinHandler = {
+    /*
+     * 初始化驱动函数
+     * 
+     * @param {bool} realTimeSearch 是否需要进行实时搜索
+     * @param {HTMLFormElement} form 搜索表单DOM元素
+     *
+     */
+    init(realTimeSearch, HTMLFormElement){
+
+    }
+
+    /*
+     * 搜索条件展示点击X按钮的处理函数
+     *
+     * @param {object} jquery的点击事件event
+     * @trigger 会触发search按钮的点击事件，以触发搜索
+     * @returns 无返回
+     *
+     * TODO 这里临时使用了一个全局变量的flag，这种实现方式不太好
+     * 虽然比较方便
+     */              
+    closeFilterSpan(event){
+
+    }
+
+};
+```
+
+上面的@author @return都是注释标签，其他常用的注释标签还有：
+
+```javascript
+/*
+@class 表示一个类
+@constructor 构造函数
+@deprecated 被弃用
+@global 全局的变量
+@namespace 具有命名空间作用的object，如$.fn.remove，$.fn.append，$和fn就是一个namespace，而fn是$的子命名空间
+@this 这里的this指向哪里
+@throws 在这个函数里面可能会抛出什么异常
+@version 当前版本
+*/
+```
+
+#### （3）变量定义和代码的注释
+
+对一些比较重要的变量加注释，标明它是什么用途，以及对一些核心代码逻辑加上注释，或者比较复杂的业务逻辑，写了5个case，每个case分别代表了什么；为了改某个bug而加入的代码，说明下为了解决什么问题；还有某些易混的判断，为什么if判断条件写了四个，为什么代码到这个if判断不通过就直接return了；一些常量的注释，为什么会突然冒出来100这个数字；改动别人的代码，为什么要改动；等等。如：
+
+```javascript
+ var requestData = {
+        listingId: listingData.listingId,
+        page: 1,
+        //把200改成5，点击More的时候是重新刷新页面的，也没有其他地方用到，
+        //没必要请求那么多，严重影响性能
+        pageSize: 5//200    
+};
+```
+
+总之多写注释还是好的，只要不是废话：
+
+```javascript
+//定义了一个number的变量
+let number = 5;
+```
+
+或者是和逻辑不符合的错误注释。
+
+还有一种排版的注释，右括号的对应关系：
+
+```javascript
+            } //function ajax
+        } //switch(b)
+    } //if(a)
+}  //searchHandler
+```
+
+主要是为了方便在后面加代码，例如我要在switch(b)后面加代码，当我看到这个注释我就很清楚地知道需要在哪里按回车。不过一般不推荐嵌套很深的代码，或者写的很长，一个函数几百行。
+
+### 13、代码不要嵌套太深
+
+有些人的代码经常会套个七八层，以jQuery代码为例，如下：
+
+```javascript
+var orderHandler = {
+    bindEvent: function(){
+        $(".update-order").on("click", function(){
+            if(orderStatus === "active"){
+                ajax({
+                    url: "/update-order",
+                    success: function(data){
+                        for(let i = 0; i < data.orders.length; i++){
+                            dom.append();
+                        }
+                    }
+                });
+            } else {
+                ajax({
+                    url: "/create-order",
+                    success: function(data){
+                
+                    }
+                });
+            }
+        });
+    }
+};
+```
+
+上面的代码最深的一层缩进了八层，你可能会觉得这样逻辑挺清晰的啊，但是这种写法同时也有点面条式。以上代码如果让我写，我会这么组织：
+
+```javascript
+var orderHandler = {
+    sendUpdateOrderReq: function(requestUrl, successCallback){
+        ajax({
+            url: requestUrl,
+            success: successCallback;
+        });
+    },
+    updateOrder: function(event){
+        let requestUrl = orderStatus === "active" ? "/update-order" 
+                                : "create-order";
+        //更新订单回调函数
+        let activeUpdateCallback = function(data){ 
+            for(var i = 0; i < data.orders.length; i++){
+                console.log(data.orders[i].id);
+            }       
+        };
+        //创建订单回调函数
+        let inactiveUpdateCallback = function(data){
+        
+        };      
+        
+        let successCallback = {
+            active: activeUpdateCallback,
+            inactive: inactiveUpdateCallback
+        };
+        //发请求处理订单
+        searchHandler.sendUpdateOrderReq(requestUrl, 
+                                                    successCallback[orderStatus]);
+    },      
+    bindEvent: function(){
+        $(".update-order").on("click", searchHandler.updateOrder);
+    }                                               
+                                                    
+};
+```
+
+首先把绑定的匿名函数改成有名的函数，这样有个好处，当你想要off掉的时候随时可以off掉，然后可以减少一层缩进，接着把根据orderStatus不同的回调先用变量判断好，而不是同时积压到后面再一起处理。再把发送请求的函数再单独抽出来作为一个函数，这样可以减少两层缩进。上面最深的缩进为4层，减少了一半。并且你会发现这样写代码逻辑会更加清晰，我在bindEvent里面扫一眼就可以知道哪些DOM绑了哪些事件，然后我如果对哪个DOM的事件感兴趣再跳到相应的回调函数去看，而不用拉了一两页才在bindEvent里面找到目标DOM。并且把updateOrder单独作为一个独立的函数，其他地方如果需要也可以使用，例如可能还有一个组合功能的操作可能会用到。另外把ajax再做一层抽象主要是这个东西实在是太常用，让人一样就知道要干嘛，把它分离到另外一个地方可以让具体的业务代码更加简单，例如上面发送请求，我把回调函数准备好之后，只要执行一行代码就够了。
+
+你缩进太多层，一行就被空格占掉了三、四十个字符，观感上就不是很好，还会出现上面提到的问题，最后要写好多右括号收尾的情况，并且一个函数动不动就两、三百行。
+
+### 14、jQuery编码规范
+
+如果你使用了jQuery。
+
+#### （1）使用closest代替parent
+
+尽量不要使用parent去获取DOM元素，如下代码：
+
+```javascript
+var $activeRows = $this.parent().parent().children(".active");
+```
+
+这样的代码扩展性不好，一旦DOM结构发生改变，这里的逻辑分分钟会挂掉，如某天你可能会套了div用来清除浮动，但是没想到导致有个按钮点不了就坑爹了。
+
+应该用closest，如：
+
+```javascript
+var $activeRows = $this.closest(".order-list").find(".active");
+```
+
+直接定位和目标元素的最近共同祖先节点，然后find一下目标元素就好了，这样就不会出现上面的问题，只要容器的类没有变。如果你需要处理非自己的相邻元素，可以这么搞：
+
+```javascript
+$this.closest("li").siblings("li.active").removeClass("active");
+$this.addClass("active");
+```
+
+有时候你可以先把所有的li都置成某个类，然后再把自己改回去也是可取的，因为浏览器会进行优化，不会一见到DOM操作就立刻执行，会先排成一个队列，然后再一起处理，所以实际的DOM操作对自己先加一个类然后再去掉的正负相抵操作很可能是不会执行的。
+
+#### （2）选择器的性能问题
+
+如下代码：
+
+```javascript
+$(".page ul").addClass("shown");
+$(".page .page-number").text(number);
+$(".page .page-next").removeClass("active");
+```
+
+上面的代码做了三个全局查找，其实可以优化一下：
+
+```javascript
+var $page = $(".page");
+$page.find("ul").addClass("shown");
+$page.find(".page-number").text(number);
+$page.find(".page-next").removeClass("active");
+```
+
+先做一个全局查找，后续的查DOM都缩小到$page的范围，\$page的几点只有几十个，在几个里面找就比在document几百上千个节点里面查找要快多了。jQuery的查DOM也是用的querySelectorAll，这个函数除了用在document之外，可用在其他DOM节点。
+
+#### （3）on事件之前需要的时候才off
+
+有些人喜欢在绑定事件之前先off掉，这样感觉可以确保万无一失，但是如果你绑定的事件是匿名的，你很可能会把其他JS文件绑定的事件一起off掉了，并且这样不容易暴露问题，有时候你的问题可能是重复绑定事件，如点一次按钮就绑一次导致绑定了多次，所以根本原因在这里。你应该要确保事件只被绑定一次，而不是确保每次写之前都先off掉。如果你的事件容易出现绑定多次的情况说明你的代码组织有问题，这个在开发的时候应该是能够暴露出来的。
+
+#### （4）对DOM节点较少的不要使用委托
+
+例如说一个表单只有几个input元素，然后你给input加上个委托到form上面，甚至有时候是body上面，由于事件冒泡导致在form上或者在页面上的所有操作都会冒泡到form/body上，即使操作的不是目标元素，这样jQuery就会收到body上的事件，然后再判断处理所有的操作的目标元素是不是你指定的那个，如果是再触发你绑定的回调函数。特别是像mousemove触发得很频繁的事件都需要执行。所以如果元素比较少或者不需要动态增删的那种就不要使用冒泡了，直接绑定在对应的元素上就好了。
+
+#### （5）有时候使用原生更简单
+
+例如获取表单的input元素和它的value：
+
+```javascript
+let email = form.email.value.trim();
+```
+
+如果form里面有一个input[name=email]的输入框，就可以这么用。
+
+再如，改变一个button的状态，下面两个其实差不多，但是如果获取不到dom元素的话第一个会挂：
+
+```javascript
+$("#update-order")[0].disabled = true;
+$("#update-order").prop("disabled", true);
+```
+
+设置一个元素的display为block：
+
+```javascript
+div.style.display = "block";
+```
+
+但是绝大多数的情况下还是要使用jq的API以确保兼容性，如下获取scrollTop：
+
+```javascript
+//在Firefox永远返回0
+let _scrollTop = document.body.scrollTop();
+//正确方法
+let scrollTop = $(window).scrollTop();
+```
+
+因为在firefox里面需要使用：
+
+```javascript
+let scrollTop = document.documentElement.scrollTop;
+```
+
+而这个在Chrome里面永远返回0。再如window.innerwidth在某些低版本的安卓手机上会有问题。所以当你不确定兼容性的时候，就不要使用原生API，不然你得经过小心验证后再使用。你可以不用，但不是说不要去了解原生API，多去了解原生DOM操作还是挺有帮助的。
+
+### 15、对于常用的属性进行缓存
+
+如下代码，频繁地使用了window.location这个属性：
+
+```javascript
+let webLink = window.location.protocol + window.location.hostname;
+if(openType === "needtoTouch"){
+    webLink += "/admin/lead/list/page" + 
+             window.location.search.replace(/openType=needToTouch(&?)/, "") + 
+             window.location.hash;
+}
+```
+
+可以先把它缓存一下，加快变量作用域查找：
+
+```javascript
+let location = window.location;
+let webLink = location.protocol + location.hostname;
+if(openType === "needtoTouch"){
+    webLink += "/admin/lead/list/page" +
+                location.search.replace(/openType=needToTouch(&?)/, "") +       
+                location.hash;
+}
+```
+
+当把location变成一个局部变量之后，它的查找时间将明显快于全局变量。你可能会说就算再快这点时间对于用户来说还是没有区别的吧，但是这是作为一名程序员的追求，以及可以让代码更简洁。
+
+### 16、尽量不要在JS里面写CSS
+
