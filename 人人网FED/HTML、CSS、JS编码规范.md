@@ -1865,3 +1865,359 @@ if(openType === "needtoTouch"){
 
 ### 16、尽量不要在JS里面写CSS
 
+如下代码，如果是非选中状态就把颜色置灰：
+
+```javascript
+$menuItem.css("color", "#ccc");
+```
+
+反之颜色恢复正常：
+
+```javascript
+$menuItem.css("color", "#000");
+```
+
+这样的代码有问题，如果以后颜色改了，那么你需要改两个地方，一个是CSS里设置，另一个是JS里面设置，而JS写的样式特别容易被忽略，查起来也不好定位。好的做法应该是通过添加删除类的方法：
+
+```javascript
+//变成选中态
+$menuItem.addClass("selected");
+//变成非选中态
+$menuItem.removeClass("selected");
+```
+
+然后再通过CSS给selected的类添加样式。如果是button之类的控件可以结合:disabled、:checked、:valid等伪类，连类都不用添加。
+
+但是有一种地一定要用JS控制的，就是需要先计算然后动态地改变position或者transform的值，如果用CSS3的transition实现不了。
+
+### 17、在必要的地方添加非空判断
+
+添加非空判断可以提高代码的健壮性，如下代码：
+
+```javascript
+//弹框时显示other monthly charge
+showOtherMonthlyCharge: function(otherCharges, $dialog){
+    if(!otherCharges || !otherCharges.length){
+        return;
+    }   
+}
+```
+
+如果传的值为空就不用处理，有时候你可能要抛出异常，告诉调用者。对一些比较重要的地方可能还要添加类型检验。后端传的数据要确保会有那个属性，如果不确定也要添加非空判断。如果调用了第三方的API，添加出错处理也很重要，因为你不能确保第三方API一定能正常工作，在一些你觉得可能会挂的地方做处理，如请求可能会超时，或者返回了undefined的异常结果，这种多使用一般能够发现。
+
+### 18、不要用for in循环数组
+
+如下代码：
+
+```:vatican_city:
+let a = [9, 3, 5];
+for(let i in a){
+  console.log(a[i])
+}
+```
+
+正常情况下将会输出数组的元素，但是很不幸的是，如果有人给数组原型添加了一个函数：
+
+```:vanuatu:
+Array.prototype.add = function(){};
+```
+
+循环里的i将会有4个值：0,1,2，“add”，这样就导致你的遍历出现问题，所以数组遍历应该使用length属性或者数组的forEach/map方法。
+
+### 19、分号规范
+
+JS里面的表达式是可以不用分号结尾，例如Zepto的源码几乎没看到一个分号，但是我们还是要提倡每个句子后面都要加上分号，这样不容易出错。
+
+### 20、使用location跳转需要先转义
+
+对于那些根据用户输入内容做跳转，需要先把用户内容做转义，如下有问题的代码：
+
+```javascript
+let searchContent = form.search.value.trim();
+window.location.href = `/search?key=${searchContent}`;
+```
+
+如果用户输入了一个#号如门牌号，将会导致#后面的内容被当作锚点了，或者用户可能会输入一个空格。所以如果不确定内容的东西需要先encode一下，如下代码：
+
+```javascript
+let searchContent = encodeURIComponent(form.search.value.trim());
+window.location.href = `/search?key=${searchContent}`;
+```
+
+这样跳转就没有问题了。
+
+### 21、点击跳转尽量不要使用onclick跳转
+
+点击一个容器的时候做跳转，有些人喜欢这么写：
+
+```html
+<div onclick="window.locatioin.href='/listing/detail?id={{listingId}}'">
+    <img>
+    <div></div>
+</div>
+```
+
+其实这样写不好，不利于SEO，如果是一个跳转应该用a标签，如下：
+
+```html
+<a href="window.locatioin.href='/listing/detail?id={{listingId}}'">
+    <img>
+    <div></div>
+</a>
+```
+
+同时把标签变成块级。就算你不用做SEO，也应当尽量使用这种方式，因为用这种方式比较自然，还可以控制是否要开新页，如果在移动端也不用考虑click事件是否有延迟问题。
+
+### 22、不要直接使用localStorage
+
+由于Safari的隐身模式下本地存储会被禁用，如果你尝试往localStorage写数据的话，会报超出使用限制的错误：
+
+> QuotaExceededError (DOM Exception 22): The quota has been exceeded.
+
+而Chrome的隐身窗口不会禁用，使用Safari的用户可能会开隐身窗口，特别是手机上的。这样就导致代码抛出异常，所以为了兼容Safari，不能直接使用localStorage，要做个兼容：
+
+```javascript
+Data.hasLocalStorage = true;
+try{
+    window.localStorage.trySetData = 1;
+}catch(e){
+    Data.hasLocalStorage = false;
+}
+setLocalData: function(key, value){ 
+    if(Data.hasLocalStorage){
+        window.localStorage[key] = value;
+    }
+    else{   
+        util.setCookie("_LOCAL_DATA_" + key, value, 1000);
+    }
+},
+getLocalData: function(key){
+    if(Data.hasLocalStorage){
+        return window.localStorage[key];
+    }
+    else{
+        return util.getCookie("_LOCAL_DATA_" + key);
+    }
+}
+```
+
+上面代码做了个兼容，如果支持localStorage就使用cookie。要注意cookie一个域名最多只能有4kb，50个key，而本地存储限制为5Mb。
+
+### 23、使用简单的转换
+
+#### （1）把字符串转整型可以使用+号
+
+```javascript
+let maxPrice = +form.maxPrice.value;
+```
+
++号相当于Number
+
+```javascript
+let maxPrice = Number(form.maxPrice.value);
+```
+
+parseInt和Number有一个很大的区别是parseInt("10px")结果为10，而Number("10px")是NaN，parseInt会更加自然，其他编程语言也有类似的转换。但是Number还是能适用很多的场景。
+
+#### （2）把小数去掉尾数转成整型，可以使用>>0
+
+如果计算某个数字在第几排：
+
+```javascript
+let _row = Math.floor(index / columns);
+let row = parseInt(index / columns);
+```
+
+都可改成：
+
+```javascript
+let row = index / columns >> 0;
+```
+
+这个用位运算的效率会明显高于上面两个。
+
+#### （3）转成boolean值用!!
+
+如下代码：
+
+```javascript
+let mobile = !!ua.match(/iPhone|iPad|Android|iPod|Windows Phone/)
+```
+
+### 24、注意返回false的变量
+
+有几个值再if判断里面都返回false：0、false、“ ”、undefined、null、NaN都是false，所以判断一个数组有没有元素可以这么写：
+
+```javascript
+if (array.length) {}
+```
+
+而不用写成：
+
+```javascript
+if (array.length !== 0) {}
+```
+
+判断一个字符串是不是空可以写成：
+
+```javascript
+if (str) {}
+```
+
+但是判断一个变量有没有定义还是要写成：
+
+```javascript
+if (typeof foo !== “undefined”) {}
+```
+
+因为如果直接if变量的话，上面的几个可能取值都将认为是没定义。
+
+### 25、使用Object.assign简化数据赋值
+
+如下代码，在发请求之前，经常需要获取表单的值，然后去修改和添加老数据提交：
+
+```javascript
+var orderData = {
+    id: 123,
+    price: 500
+}
+
+orderData.price = 600;
+orderData.discount = 15;
+orderData.manageFee = 100;
+```
+
+其实有一种更优雅的方式那就是使用Object.assign：
+
+```javascript
+var setOrderData = {
+    price: 600,
+    discount: 15,
+    manageFee: 100
+}
+
+Object.assgin(orderData, setOrderData);
+```
+
+使用这个的好处是可以弄一个setOrderData的Object，写成大括号的形式，而不用一个个去赋值，写起来和看起来都比较累。最后再assign下赋值给原先的Object就可以了。
+
+### 26、调试完去掉无关的console
+
+调试完就把console.log之类的打印信息去掉，别想着等一下做完了再删，等一下就忘了。林外，不要使用alert调试，console/debugger上线了都没事，一般用户也不会开一个控制台，但是alert上线了就完蛋了，特别是有些人喜欢用alert("fuck")之类的看下代码有没有运行到这里，这种调试技巧还是比较初级，要是真上线了可能得卷铺盖走人了。这也可以通过代码检查工具做静态检查。
+
+### 27、注意this的指向
+
+如下代码：
+
+```javascript
+let searchHandler = {
+    search() {
+        console.log(this);
+        this.ajax();
+    },
+    ajax() {
+
+    }
+};
+$searchBtn.on("click", searchHandler.search);
+```
+
+当触发searchBtn的点击事件时，search函数里的this已经指向searchBtn了，因为他是click的回调函数：
+
+```javascript
+searchHandler.search.call(btn, event);
+```
+
+所以函数运行环境就变成了btn了，因此这种单例的Object最好不要使用this，应该直接使用当前命名空间的变量名：
+
+```javascript
+let searchHandler = {
+    search() {
+        console.log(this);
+        searchHandler.ajax();
+    },
+    ajax() {
+
+    }
+};
+$searchBtn.on("click", searchHandler.search);
+```
+
+这样就没问题了。
+
+### 28、使用正则表达式做字符串处理
+
+正则表达式可以很方便地处理字符串，通常只要一行代码就搞定了。例如去掉全局的某一个字符，如去掉电话号码的-连接符：
+
+```javascript
+phoneNumer = phoneNumber.replace(/\-/g, “”);
+```
+
+或者反过来，把电话号码改成3-3-4的形式：
+
+```javascript
+phoneNumber = phoneNumber.replace(/^(\d{3})(\d{3})(\d{4})$/, “$1-$2-$3”);
+```
+
+熟练掌握正则表达式时每个前端的基本技能。
+
+### 29、保持复用模块的观念
+
+当你一个函数要写得很长的时候，例如两、三百行，这个时候你考虑把这个大函数给拆了，拆成几个小函数，然后让主函数的逻辑变得清晰简洁，而每个小函数的功能单一独立，使用者只需要关心输入输出，而不需要关系内部是怎么运行的。如下在地图里面处理用户点击的处理函数：
+
+```javascript
+handleMouseClick(latLng, ajax = true) {
+    var path = this.path;
+    // 这里调了一个closeToFirstPoint的函数判断点击位置是否接近第一个点
+    if(path.length >= 2 && ajax && this.closeToFirstPoint(latLng)){
+        // 如果是的话调closePath关闭路径
+        this.closePath(ajax);
+        return;
+    }
+    path.push({lat: latLng.lat(), lng: latLng.lng()});
+    // 调画点的函数
+    this.drawPoint(latLng);
+    // 调画线的函数
+    this.drawSolidLine();
+    // 调画多边形背景的函数
+    this.drawPolygonMask();
+    this.lastMoveLine && this.lastMoveLine.setMap(null);
+    this.$drawTip.hide();
+}
+```
+
+上面拆成了很多个小函数，如画点的drawPoint函数，使用这个函数只需要关心给它一个当前点的经纬度就可以了，它就帮你画一个点。
+
+在函数之上又可以继续抽象，如把这个画图功能的模块写成一个DrawTool的类，这个列负责整个画图的功能，使用者只需要实例化一个对象，然后调用一下init，传一些参数就好了。
+
+先抽象成不同的函数，每个函数负责一小块，相似的函数聚集在一起形成一个模块，几个模块的相互调用又形成一个插件。
+
+### 30、注意label事件会触发两次
+
+如果label里面有input，监听label的事件会触发两次，如下代码：
+
+```html
+<form id="choose-fruit">
+    <label>
+        <input type="radio" name="fruit" value="apple">
+        <span>apple</span>
+    </label>
+    <label>
+        <input type="radio" name="fruit" value="pear">
+        <span>pear</span>
+    </label> 
+<form>
+<script>
+{
+    let $form = $("#choose-fruit");
+    $form.find("label").on("click", function(event){
+        console.log(event.target);
+    });
+}
+</script>
+```
+
+当点击到span的时候，click事件会触发两次，如果label里面没有input的话，就会触发一次。这是为什么呢？因为在label容器内，点击到span文件的时候会下发一次click事件给input，input事件又会冒泡到label，因此label会触发两次。因此如果你直接监听lable事件要注意触发两次的情况。
+
+
+
