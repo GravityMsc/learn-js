@@ -483,5 +483,53 @@ HTTP/2的多路复用就介绍到这里，上面说的流都是由浏览器主�
 
 虽然使用了HTTP/2没有了6个的限制，但是我们发现css/js需要在html解析了之后才能触发记载，而图片时通过JS的new Image触发加载，所以它们需要等到JS下载完并解析好了才能开始加载。
 
+所以Server Push就是为了解决这个加载延迟问题，提前把网页需要的资源Push给浏览器。[Nginx1.13.9](https://www.nginx.com/blog/nginx-1-13-9-http2-server-push/)版本开始支持，是在最近（2018/2）才有的。通过编译一个新版本的nginx就能体验Server Push的功能，给nginx.conf添加以下配置：
 
+```nginx
+location = /html/walking-dog/index.html {
+    http2_push /html/walking-dog/main.js?ver=1;
+    http2_push /html/walking-dog/main.css;
+    http2_push /html/walking-dog/dog/0.png;
+    http2_push /html/walking-dog/dog/1.png;
+    http2_push /html/walking-dog/dog/2.png;
+    http2_push /html/walking-dog/dog/3.png;
+    http2_push /html/walking-dog/dog/4.png;
+    http2_push /html/walking-dog/dog/5.png;
+    http2_push /html/walking-dog/dog/6.png;
+    http2_push /html/walking-dog/dog/7.png;
+    http2_push /html/walking-dog/dog/8.png;
+}
+```
+
+指定需要Push的资源，然后观察加载的时间线：
+
+![Push加载的时间线](https://user-gold-cdn.xitu.io/2018/3/18/16234e05bca3b93b?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+我们发现加载时间有了一个质的改变，基本上在100ms左右就加载完了。所以Server Push用得好的话作用还是挺大的。
+
+Server Push的流是通过Push Promise类型的帧打开的，Promise的帧格式如下图所示：
+
+![Promise的帧格式](https://user-gold-cdn.xitu.io/2018/3/18/16234e05dbb8488c?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+它其实就是一个请求的HEADER帧，但是它和HEADER又不太一样，没有weight/dependency那些东西。
+
+按照上面的格式，观察一下加上Push Promise之后，帧传递的过程是怎么样的。
+
+浏览器在stream_id = 1的流里面请求加载index.html，这个时候服务并没有立刻响应头部和数据，而是先连续返回了11个Push Promise的帧，stream的id分别为2、4、6等，然后浏览器立刻创建了相应的stream。收到了2的promise之后就创建了2的stream，收到4的之后就创建4的。这个时候流创建好了就开始加载，不用等到解析到html或者js之后才开始。
+
+在这个过程中，Chrome会先解析promised stream id，如下图所示：
+
+![id](https://user-gold-cdn.xitu.io/2018/3/18/16234e05bfa2f148?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+然后再去解析Hpack的头部，再用这个头部去创建流。Server Push我们就不再深入讨论了，读者可以打开[这个网址](https://fed.renren.com/html/walking-dog/index.html)感受一下。
+
+综上，我们主要讨论了HTTP/2的三大特性：
+
+（1）头部压缩，通过规定头部字段的静态表格和实际传输过程中动态创建的表格，减少多个相似请求里面大量冗余的HTTP头部字段，并且引入了霍夫曼编码减少字符串常量的长度。
+
+（2）多路复用，只使用一个TCP连接传输多个资源，减少TCP连接数，为了能够让高优先级的资源如CSS等更先处理，引入了优先级依赖的方法。由于并发数很高，同时传递的资源很多，如果网速很快的时候，可能会导致缓存空间溢出，所以又引入了流控制，双方通过window_size控制对方的发送。
+
+（3）Server Push，解决传统HTTP传输中资源加载触发延迟的问题，浏览器在创建第一个流的时候，服务告诉浏览器哪些资源可以先加载了，浏览器提前进行加载而不用等到解析到的时候再加载。
+
+国内使用HTTP/2的还没怎么见到，淘宝之前是有开启HTTP/2的，不知道为什么现在又下掉了，国外使用HTTP/2的网站还是很多的，像谷歌搜索、CSS-Tricks、Twitter、Facebook等都使用了HTTP/2。如果你有自己的网站的话，可以尝试一下。
 
