@@ -427,5 +427,78 @@ cookie是在请求头里以普通键值对的方式存在，一般一个domain�
 
 上面的一些基础问题讨论完了，我们终于可以来分析WebSocket了。
 
+## 11、WebSocket
 
+（1）实现一个Web聊天
 
+怎么实现一个http的wen的实时聊天呢，怎么知道对方有没有发送消息给我呢？有几种方法。
+
+第一种方法使用轮询，例如每隔2秒就发送一个请求向服务端查询，但是这种方法会造成资源的浪费。
+
+第二种办法使用Service Worker实现浏览器的Push，这种方法需要先注册FCM账号，获取一个App Id，用Service Worker监听，服务向https://android.googleapis.com/gcm/send发送消息，谷歌服务器就会向那个App Id发送一个推送，就实现了浏览器的Push。但是这种方法兼容性还不是很好，并且大陆的小伙伴无法在正常网络环境受到谷歌服务器的消息。
+
+所以就有了WebSocket建立常连接。为此建立了一个WebSocket的demo。
+
+（2）WebSocket的Demo
+
+为了实验，写一个WebSocket的Demo，先装一个WebSocket的Node包，然后监听在8080端口，接着写客户端html5 WebSocket代码。
+
+```javascript
+var socket = new WebSocket("ws://10.2.200.140:8080");
+socket.open = function(){
+    socket.seng("长江长江，我是黄河");
+}
+socket.onmessage = function(event){
+    document.wirte("收到来自黄河的消息：" + event.data);
+}
+```
+
+打开这个页面，浏览器就会显示一个WebSocket的连接：
+
+![WebSocket的连接](http://fed.renren.com/wp-content/uploads/2017/05/15-5.png)
+
+然后我们用tcpdump研究WebSocket连接建立的过程。
+
+（3）WebSocket连接建立
+
+首先还是要先建立tcp连接，完成后客户端发送一个upgrade的http请求：
+
+> 14:23:36.926775 IP 10.2.200.11.61205 > 10.2.200.140.8080: Flags [P.], seq 1:435, ack 1, win 4117, options [nop,nop,TS val 848067548 ecr 685816156], length 434: HTTP: GET / HTTP/1.1
+
+这个报文的详细内容如下：
+
+![upgrade的报文](http://fed.renren.com/wp-content/uploads/2017/05/19-1.png)
+
+服务端收到后统一握手，返回Switching Protocols，连接建立，如下报文：
+
+> 14:23:36.929714 IP 10.2.200.140.8080 > 10.2.200.11.61205: Flags [P.], seq 1:164, ack 435, win 4104, options [nop,nop,TS val 685816195 ecr 848067548], length 163: HTTP: HTTP/1.1 101 **Switching Protocols**
+
+详细内容如下所示：
+
+![切换协议](http://fed.renren.com/wp-content/uploads/2017/05/18-2.png)
+
+（4）传送数据
+
+发送“hello，world”12字节内容，用ws只需要发送18字节，这比http300个字节要少了很多：
+
+> 14:24:36.009503 IP 10.2.200.11.61205 > 10.2.200.140.8080: Flags [P.], seq 492:510, ack 168, win 4112, options [nop,nop,TS val 848126486 ecr 685863159], **length 18**: HTTP
+>
+> 14:24:36.009556 IP 10.2.200.140.8080 > 10.2.200.11.61205: Flags [.], ack 510, win 4101, options [nop,nop,TS val 685875098 ecr 848126486], length 0
+
+具体可以定义消息的类型，例如type = 1表示心跳消息，type = 2表示用户发送的消息，还可以再定义subtype，并自定义消息内容的格式，再封装一些自定义的消息机制等等。
+
+（5）关闭连接
+
+30s后，双方没有传送数据，WebSocket连接关闭，进行四次挥手。
+
+> **14:25:06**.017016 IP 10.2.200.140.8080 > 10.2.200.11.61205: Flags **[F.]**, seq 170, ack 510, win 4101, options [nop,nop,TS val 685904974 ecr 848146558], length 0
+
+这样就实现了一个实时的web聊天，需要注意的是websocket是一套协议，任何人只要遵守这套协议就可以使用并和其他人互联，不管你是JS还是Android/IOS/C++/Java。ws默认监听在80端口，wss监听在443端口，和http/https一样。
+
+最后再比较一下WebSocket和webRTC
+
+（6）WebSocket和WebRTC
+
+WebSocket是为了解决实时传送消息的问题，当然也可以传送数据，但是不保证传送的效率和质量，而WebRTC可用于可靠地传输音视频数据、文件等。并且可建立P2P连接，不需要服务器进行转发数据。虚拟电话、在线面试等现在很多都采用WebRTC实现。
+
+最后做个总结。这篇文章介绍了很多通信协议的东西，分析了TCP/IP的三次握手和四次挥手，并讨论了为什么握手是三次，而挥手是四次，还讲了四层网络模型，分析了工作在不同层的协议和工具，后面又重点分析了TCP的拥塞控制，包括超时重传、慢启动和拥塞避免、快速重传和快速恢复，接着还讲了点HTTP的东西，最后简单分析了下Websocket连接的过程和它的特点以及和WebRTC的区别。上面可以说是TCP/IP协议的核心内容，我们通过一两个demo把它给串了起来，对读者应该有一个启发作用，可以更深刻地理解网络协议，当你在写一个请求的时候，你知道它的背后发生了什么。读者可以根据本文再继续查阅相关资料延伸扩展。如有不正确之处还请指出。
