@@ -153,3 +153,80 @@ for (let i = 0; i < $lis.length; i++) {
 
 ## 3、SVG路径动画
 
+SVG还可以做路径动画，可以用钢笔工具勾勒一条路径，然后让目标元素沿着这个路径运动。如下效果所示：
+
+![路径动画](https://user-gold-cdn.xitu.io/2018/3/31/1627bf1d4ddfb091?imageslim)
+
+代码如下所示：
+
+```html
+<svg viewBox="0 0 2706 2048" width="120" height="66" class="svg-hand">
+    <g id="hand">
+        <!--手上的圆圏-->
+        <circle cx="370" cy="90" r="210" fill="yellow"></circle>
+        <!--手的形状-->
+        <path d="..."></path>
+    </g>
+    <!--动画路径-->
+    <path id="animation-hand-arc" d="M-514,665c0,0,1378.463-1138.762,2891,0" stroke="transparent" fill="transparent"/>
+    <!--动画设置-->
+    <animateMotion id="arcmove" xlink:href="#hand" dur="1s" begin="0" fill="freeze" repeatCount="1">
+        <mpath xlink:href="#animation-hand-arc" />
+    </animateMotion>
+</svg>
+```
+
+这里主要使用了animateMotion标签，通过它的mpath指定一个动画路径，就可以了。
+
+这个路径可以用PS的钢笔工具画一个形状，然后导出成SVG（PS CC版本支持）或者是用在线的一些SVG编辑工具也是可以的。而运动的目标元素（如上面的手）可以使用图标字体里的SVG，这里比较麻烦的地方是自己勾勒的路径需要根据图标字体SVG的viewbox做调整，比例才对得上。
+
+例如如果图标字体的viewbox是1024 * 1024的，那么你的PS画布大小也得是1024 *1024的，如下笔者画的弧形路径：
+
+![弧形路径](https://user-gold-cdn.xitu.io/2018/3/31/1627bf1d75de429b?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+导出来的SVG文件是这样的：
+
+```html
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+     width="1024px" height="1024px" viewBox="0 0 1024 1024" style="enable-background:new 0 0 1024 1024;" xml:space="preserve">
+<path d="M-514,665c0,0,1378.463-1138.762,2891,0"/>
+</svg>
+```
+
+复制里面的path路径：
+
+> M-514,665c0,0,1378.463-1138.762,2891,0
+
+作为上面动画的路径。
+
+我们可以进一步完善这个动画，如果现在要求动画不是立马开始，如刷新页面后隔个0.5s再开始，并且要求那只手一开始的时候没有出现，动画开始才出现，主要是为了给个时间先处理页面其他元素。
+
+可以把动画的begin改成0.5s，hand元素一开始设置成不可见：
+
+```html
+<svg viewBox="0 0 2706 2048" width="120" height="66" class="svg-hand">
+    <!--一开始是不可见的-->
+    <g id="hand" visibility="hidden">
+        <!--手上的圆圏-->
+        <circle cx="370" cy="90" r="210" fill="yellow"></circle>
+        <!--手的形状-->
+        <path d="..."></path>
+        <!--动画开始后设置成可见-->
+        <set attributeName="visibility" from="hidden" to="visible" begin="arcmove.begin"/>
+    </g>
+    <!--动画路径-->
+    <path id="animation-hand-arc" d="M-514,665c0,0,1378.463-1138.762,2891,0" stroke="transparent" fill="transparent"/>
+    <!--动画设置-->
+    <animateMotion id="arcmove" xlink:href="#hand" dur="1s" begin="0.5s" fill="freeze" repeatCount="1">
+        <mpath xlink:href="#animation-hand-arc" />
+    </animateMotion>
+</svg>
+```
+
+上面代码主要通过在g元素里面添加一个set标签：
+
+```html
+<set attributeName="visibility" from="hidden" to="visible" begin="arcmove.begin"/>
+```
+
+也就是说动画的begin可以是另外一个动画的begin或者end。如果要在某个动画结束后开始，则可以把begin改成arcmove.end即可。
