@@ -409,3 +409,132 @@ addStars () {
 ## 6、让星星闪起来
 
 通过做星星透明度的动画，可以让星星闪起来。如果用Canvas标签，可以借助window.requestAnimationFrame注册一个函数，然后用当前时间减掉开始的时间模以一个值就得到当前的透明度系数。使用Houdini也可以使用这种方式，区别是我们可以把动态变化透明系数当作当前元素的CSS变量或者叫自定义属性，让后用JS动态改变这个自定义属性，就能够触发重绘，这个已经在第3点重绘部分提到。
+
+给元素添加一个--star-opacity的属性：
+
+```css
+body:before {
+    --star-opacity: 1;
+    --star-density: 0.5;
+    --starry-sky-seed: 1;
+    background-image: paint(starry-sky);
+}
+```
+
+在绘制星星的时候，每个星星的透明度再乘以这个系数：
+
+```javascript
+// 获取透明度系数
+this.starOpacity = +properties.get('--star-opacity').toString();
+for (let star of this.stars) {
+    // 每个星星的透明度都乘以这个系数
+    let opacity = +('.' + (star.opacityOne + star.opacityTwo)) * this.starOpacity;
+    ctx.fillStyle = `hsla(${star.hue}, 30%, 80%, ${opacity})`;
+    ctx.fillRect(star.x, star.y, star.size, star.size);
+}
+```
+
+然后再requestAnimationFrame动态改变这个CSS属性：
+
+```javascript
+let start = Date.now();
+// before无法获取，所以需要改成正常元素
+let node = document.querySelector('.starry-sky');
+window.requestAnimationFrame(function changeOpacity () {
+    let now = Date.now();
+    // 每隔一1s，透明度从0.5变到1
+    node.style.setProperty('--star-opacity', (now - start) % 1000 / 2 + 0.5);
+    window.requestAnimationFrame(changeOpacity);
+});
+```
+
+这样就能重新触发paint函数重新渲染了，但是这个效果其实是有问题的，因为得有一个alternate轮流交替的效果，即0.5变到1，再从1变到0.5，而不是每次都是0.5到1.模拟CSS animation的alternate这个也好解决，可以规定奇数秒就是变大，而偶数秒就是变小，这个好实现，从略。
+
+但实际上可以不用这么麻烦，因为改变CSS属性直接用animation就可以了，如下代码所示：
+
+```css
+body:before {
+    --star-opacity: 1;
+    --star-density: 0.5;
+    --starry-sky-seed: 1;
+    background-image: paint(starry-sky);
+    animation: shine 1s linear alternate infinite;
+}
+
+@keyframes shine {
+    from {
+        --star-opacity: 1;
+    }
+    to {
+        --star-opacity: 0.6;
+    }
+}
+```
+
+这样也能触发重绘，但是我们发现它只有在from到to这两个点触发了重绘，没有中间过渡的过程。可以推测因为它认为--star-opacity的属性值不是一个数字，而是一个字符串，所以这两关键帧就没有中间的过渡效果了。因此我们得告诉它这是一个整型，不是一个字符串。类型化CSS对象模型（Typed CSSOM）提供了这个API。
+
+类型化CSS对象模型一个很大的作用就是把所有的CSS单位都用同一个相应的对象来表示，提供加减乘除等运算，如：
+
+```javascript
+// 10 px
+let length = CSS.px(10);
+// 在循环里面改length的值，不用自己去拼字符串
+div.attributeStyleMap.set('width', length.add(CSS.px(1)))
+```
+
+这样的好处是不用自己去拼接字符串，另外还提供了转换，如transform的值转成matrix，度数转成rad的形式等等。
+
+它还提供了注册自定义类型属性的能力，使用以下API：
+
+```css
+CSS.registerProperty({
+    name: '--star-opacity',
+    // 指明它是一个数字类型
+    syntax: '<number>',
+    inherits: false,
+    initialValue: 1
+});
+```
+
+这样注册之后，CSS系统就知道--star-opacity是一个number类型，在关键帧动画里面就会有一个渐变的过渡效果。
+
+类型CSS对象模型在Chrome 66已经正式支持，但是registerProperty API仍然没有开放，需要打开chrome://flags，搜索web platform，从disabled改成enabled就可以使用。
+
+这个给我们提供了做动画的新思路，CSS animation + Canvas的模式，CSS animation负责改变属性数据并触发重绘，而Canvas去获取动态变化的数据更新视图，所以它是一个数据驱动的动画模式，这也是当前做动画的一个流行方式。
+
+在我们这个例子里面，由于星星数太多，1s有60帧，每帧都要计算和绘制1000个星星，CPU使用率达到90%多，所以这个性能有问题，如果用Canvas标签可以使用双缓冲技术，CSS Houdini好像没有这个东西。但是可以换一个思路，改成做整体的透明度动画，不用每个星星都算一下。
+
+如下代码所示：
+
+```css
+body {
+    background-color: #000; 
+}
+body:before {
+    background-image: paint(starry-sky);
+    animation: shine 1s linear alternate infinite;
+}
+
+@keyframes shine {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0.6;
+    }
+}
+```
+
+这个的效果和每个星星都单独计算是一样的，CPU消耗12%左右，这个应该还是可以接受的。
+
+效果如下图所示：
+
+![星星闪烁](https://user-gold-cdn.xitu.io/2018/4/22/162eb83b2219ed05?imageslim)
+
+如果用Canvas标签，可以设置globalAlpha全局透明度属性，而使用CSS Houdini我们直接使用opacity就行了。
+
+一个完整的Demo：[CSS Houdini Starry Sky](https://fed.renren.com/html/houdini/starry-sky/)，需要使用Chrome，因为目前只有Chrome支持。
+
+总的来说，CSS Houdini和Paint Worklet提供了CSS和Canvas的粘合，让我们可以用Canvas画出想要的CSS效果，并借助CSS自定义属性进行控制，通过使用JS或者CSS的animation/transition改变自定义属性的值触发重绘，从而产生动画效果，这也是数据驱动的开发思想。并讨论了在画这个星空的过程中遇到的一些问题，以及相关的解决方案。
+
+本文只是介绍了CSS Houdini里面的Paint Worklet和Typed CSSOM，它还有另外一个Layout Worklet，利用它可以自行实现一个flex布局或者其他自定义布局，这样的好处是：一方面当有新的布局出现的时候可以借助这个API进行polyfill就不用担心没有实现的浏览器不兼容，另一方面可以发挥想象力实现自己想要的布局，这样在布局上可能会百花齐放了，而不仅仅使用W3C给的那几种布局。
