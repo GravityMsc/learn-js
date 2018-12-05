@@ -378,3 +378,168 @@ calPath(){
 }
 ```
 
+这个算法实现的关键在于用一个队列存储未经处理的节点，每处理一个节点时，就把和这个节点相连的点加入队列，这样新加入队列的节点就会排到当前层级的节点的后面，当把第一层的节点处理完了，就会把第二层的节点都push到队尾，同理当把第二层的节点都出队了，就会把第三层的节点推到队尾。这样就实现了一个广度优先搜索。
+
+在处理每个节点都需要先判断一下当前节点是否已被标记为known，如果是的话就不用处理了。
+
+在pathTable表格里面用一个prevCell记录到这个节点的上一个节点是哪个，为了能够从目的节点一直往前找到到达第一个节点的路径。最后找到这个path返回。
+
+只要有这个path，就能够计算位置画出路径的图，如下图所示：
+
+![画出路径](https://user-gold-cdn.xitu.io/2017/7/31/0f113353f2bb48f473a7383206d705ac?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+这个算法的速度还是很快的，如下图所示：
+
+![最短路径算法的计算速度](https://user-gold-cdn.xitu.io/2017/7/31/89ce6830ce5b834212d4630e4f53b9d9?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+当把迷宫的规模提高到200 * 200时：
+
+![扩大迷宫规模](https://user-gold-cdn.xitu.io/2017/7/31/d19d0653cbf05429aaa384364e1136da?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+生成迷宫的时间就很耗时了，花费了10秒：
+
+![生成迷宫的耗时](https://user-gold-cdn.xitu.io/2017/7/31/2544ce49ce777b90f7d9eb0616412cd4?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+于是想着利用WASM提高生成迷宫的效率，看看能提升多少。我在《[WebAssembly与程序编译](http://fed.renren.com/2017/05/21/webassembly/)》这篇里已经介绍了WASM的一些基础知识，本篇我将用它来生成迷宫。
+
+## 4、用WASM生成迷宫
+
+我在《[WebAssembly与程序编译](http://fed.renren.com/2017/05/21/webassembly/)》提过用JS写很难编译，所以本篇也直接用C来写。上面是用用的class，但是WASM用C写没有class的类型，只支持基本的操作。但是可以用一个struct存放数据，函数名也相应地做修改，如下代码所示：
+
+```c
+struct Data{
+    int *set;
+    int columns;
+    int rows;
+    int cells;
+    int **linkedMap;
+} data;
+
+void Set_union(int root1, int root2){
+    int *set = data.set;
+    if(set[root1] < set[root2]){
+        set[root2] = root1;
+    } else {
+        if(set[root1] == set[root2]){
+            set[root2]--;
+        }
+        set[root1] = root2;
+    }
+}
+
+int Set_findSet(int x){
+    if(data.set[x] < 0) return x;
+    else return data.set[x] = Set_findSet(data.set[x]);
+}
+```
+
+数据类型都是强类型的，函数名以类名Set_开头，类的数据放在一个struct结构里面。主要导出函数为：
+
+```c
+#include <emscripten.h>
+
+EMSCRIPTEN_KEEPALIVE //这个宏表示这个函数要作为导出的函数
+int **Maze_generate(int columns, int rows){
+    Maze_init(columns, rows);
+    Maze_doGenerate();
+    return data.linkedMap;
+    //return Maze_getJSONStr(); 
+}
+```
+
+传进来列数和行数，返回一个二维数组。其他代码相应地改成C代码，这里不再放出来。需要注意的是，由于这里用到了一些C内置的库，如使用随机数函数rand()，所以不能用上文提到的生成wasm的方法，不然会报rand等库函数没有定义。
+
+把生成wasm的命令改成：
+
+> emcc maze.c -Os -s WASM=1 -o maze-wasm.html
+
+这样它会生成一个maze-wasm.js和maze-wasm.wasm（生成的html文件不需要用到），生成的JS文件是用来自动加载和导入wasm文件的，在html里面引入这个JS：
+
+```html
+<script src="maze-wasm.js"></script>
+<script src="maze.js"></script>
+```
+
+它就会自动去加载maze-wasm.wasm文件，同时会定义一个全局的Module对象，在wasm文件加载好之后会触发onInit，所以调用它的api添加一个监听函数，如下代码所示：
+
+```javascript
+var maze = new Maze(column, row, canvas);
+Module.addOnInit(function(){
+    var ptr = Module._Maze_generate(column, row);
+    maze.linkedMap = readInt32Array(ptr, column * row);
+    maze.draw();
+});
+```
+
+有两种方法可以得到导出的函数，一种是在函数名前加_，如Module.\_Maze_generate，第二种是使用它提供的ccall或cwrap函数，如ccall：
+
+```javascript
+var linkedMapPtr = Module.ccall("Maze_generate", "number", 
+                ["number", "number"], [column, row]);
+```
+
+第一个参数表示函数名，第二个返回类型，第三个参数类型，第四个传参，或者用cwrap：
+
+```javascript
+var mazeGenerate = Module.cwrap("Maze_generate", "number", 
+                        ["number", "number"]);
+var linkedMapPtr = mazeGenerate(column, row);
+```
+
+三种方法都会返回linkedMap的指针地址，可通过Module.get得到地址里面的值，如下代码所示：
+
+```javascript
+function readInt32Array(ptr, length) {
+    var linkedMap = new Array(length);
+    for(var i = 0; i < length; i++) {
+        var subptr = Module.getValue(ptr + (i * 4), 'i32');
+        var neiborcells = [];
+        for(var j = 0; j < 4; j++){
+            var value = Module.getValue(subptr + (j * 4), 'i32');
+            if(value !== -1){
+                neiborcells.push(value, 'i32');
+            }
+        }
+        linkedMap[i] = neiborcells;
+    }
+  return linkedMap;
+}
+```
+
+由于它是一个二维数组，所以数组里面存放的是指向数组的指针，因此需要再对这些指针再做一次get操作，就可以拿到具体的值了。如果取出的值是-1则表示不是有效的相邻元素，因此C里面数组的长度是固定的，无法随便动态push，因此我在C里面都初始化了4个，因为相邻元素最多只有4个，初始化时用-1填充。取出非-1的值push到JS的数组里面，得到一个用WASM计算的linkedMap，然后再用同样的方法去画地图。
+
+最后再比较一下WASM和JS生成迷宫的时间。如下代码所示，运行50次：
+
+```javascript
+var count = 50;
+console.time("JS generate maze");
+for(var i = 0; i < count; i++){
+    var maze = new Maze(column, row, canvas);
+    maze.generate();
+}
+console.timeEnd("JS generate maze");
+
+Module.addOnInit(function(){
+    console.time("WASM generate maze");
+    for(var i = 0; i < count; i++){
+        var maze = new Maze(column, row, canvas);
+        var ptr = Module._Maze_generate(column, row);
+        var linkedMap = readInt32Array(ptr, column * row);
+    }
+    console.timeEnd("WASM generate maze");
+})
+```
+
+迷宫的规模为50 * 50，结果如下：
+
+![一般规模的迷宫](https://user-gold-cdn.xitu.io/2017/7/31/6f53b3b89e300714b400b358213279c9?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+可以看到，WASM的时间大概快了25%，并且有时候会观察到WASM的时间甚至要比JS的时间要长，这是因为算法是随机的，有时候拆掉的墙可能会比较多，所以偏差会比较大。但是大部分情况下的25%还是可信的，因为如果把随机选取的墙保存起来，然后让JS和WASM用同样的数据，这个时间差就会固定在25%，如下图所示：
+
+![速度快慢的对比](https://user-gold-cdn.xitu.io/2017/7/31/ea775706811f4da02bef3e42004b7394?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+这个时间要比上面的大，因为保存了一个需要拆的墙比较多的数组。理论上不用产生随机数，时间会更少，不过我们的重点是比较它们的时间差，结果是不管运行多少次，时间差都比较稳定。
+
+所以在这个例子里面WASM节省了25%的时间，虽然提升不是很明显，但还是有效果，很多个25%累积起来还是挺长的。
+
+综上，本文用JS和WASM使用连通集算法生成迷宫，并用最短路径算法求解迷宫的路径。使用WASM在生成迷宫的例子里面可以提升25%的速度。
