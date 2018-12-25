@@ -194,5 +194,186 @@ console.log(ulivz.__proto__ == Person.prototype)  // true
 
 这便是JavaScript的原型继承。准确的说，JavaScript的原型继承是通过\_\_proto__并借助prototype来实现的。
 
+于是，我们可以作如下总结：
 
+1. 函数对象的\_\_proto__指向Function.prototype；
+2. 函数对象的prototype指向instance.\_\_proto__；
+3. 普通对象的\_\_proto__指向Object.prototype；
+4. 普通对象没哟prototype属性；
+5. 在访问一个对象的某个属性/方法时，若在当前对象上找不到，则会尝试访问ob.\_\_proto__，也就是访问该对象的构造函数原型obCtr.prototype，若仍旧找不到，会继续查找obCtr.prototype.\_\_proto\_\_，像这样依次查找下去。若在某一刻，找到了该属性，则会立刻返回值并停止对原型链的搜索，若找不到，则返回undefined。
 
+为了检验你对上述的理解，请分析下述两个问题：
+
+1. 以下代码的输出结果是？
+
+   ```javascript
+   console.log(ulivz.__proto__ === Function.prototype)
+   ```
+
+   答案是false
+
+2. Person.\_\_proto__和Person.prototype.\_\_proto\_\_分别指向何处？
+
+   前面已经提到，在JavaScript中万物皆对象。Person很明显是Function的实例，因此，Person.\_\_proto__指向Function.prototype：
+
+   ```javascript
+   console.log(Person.__proto__ === Function.prototype)  // true
+   ```
+
+   因为Person.prototype是一个普通对象，因此Person.prototype.\_\_proto__指向Object.prototype
+
+   ```javascript
+   console.log(Person.prototype.__proto__ === Object.prototype)  // true
+   ```
+
+   为了验证Person.\_\_proto__所在的原型链中没有Object，以及Person.prototype.\_\_proto\_\_所在的原型链中没有Function，结合以下语句验证：
+
+   ```javascript
+   console.log(Person.__proto__ === Object.prototype) // false
+   console.log(Person.prototype.__proto__ == Function.prototype) // false
+   ```
+
+## 终极：原型链图
+
+上一节，我们实际上还遗留了一个问题：
+
+* 原型链如果一直搜索下去，如果找不到，那何时停止呢？也就是说，原型链的尽头是哪里？
+
+我们可以快速地利用以下代码验证：
+
+```javascript
+function Person() {}
+const ulivz = new Person()
+console.log(ulivz.name) 
+```
+
+很显然，上述输出undefined。下面简述查找过程：
+
+```javascript
+ulivz                // 是一个对象，可以继续 
+ulivz['name']           // 不存在，继续查找 
+ulivz.__proto__            // 是一个对象，可以继续
+ulivz.__proto__['name']        // 不存在，继续查找
+ulivz.__proto__.__proto__          // 是一个对象，可以继续
+ulivz.__proto__.__proto__['name']     // 不存在, 继续查找
+ulivz.__proto__.__proto__.__proto__       // null !!!! 停止查找，返回 undefined
+```
+
+最后，再回过头来看看上一节的演示代码：
+
+```javascript
+const Person = function(name, age) {
+    this.name = name
+    this.age = age
+} /* 1 */
+
+Person.prototype.getName = function() {
+    return this.name
+} /* 2 */
+
+Person.prototype.getAge = function() {
+    return this.age
+} /* 3 */
+
+const ulivz = new Person('ulivz', 24); /* 4 */
+
+console.log(ulivz) /* 5 */
+console.log(ulivz.getName(), ulivz.getAge()) /* 6 */
+```
+
+我们来画一个原型链图：
+
+![原型链图](https://user-gold-cdn.xitu.io/2018/2/27/161d355ad49d78e2?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+画完这张图，基本上所有之前的疑问都可以解答了。
+
+与其说万物皆对象，万物皆空似乎更形象。
+
+## 调料：constructor
+
+前面已经有所提及，但只有原型对象才具有constructor这个属性，constructor用来指向引用它的函数对象。
+
+```javascript
+Person.prototype.constructor === Person //true
+console.log(Person.prototype.constructor.prototype.constructor === Person) //true
+```
+
+这是一种循环引用。当然你也可以在上一节的原型链图中画上去，这里不再赘述。
+
+## 补充：JavaScript中的6大内置（函数）对象的原型继承
+
+通过前文的论述，结合相应的代码验证，整理出以下原型链图：
+
+![原型链图](https://user-gold-cdn.xitu.io/2018/2/27/161d355ad0b2e632?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+由此可见，我们更加强化了这两个观点：
+
+> 1. 任何内置函数对象（类）本身的\_\_proto__都指向Function的原型对象；
+>
+> 2. 除了Object的原型对象的\_\_proto__指向null，其他所有内置函数对象的原型对象的\_\_proto\_\_都指向Object。
+
+为了减少读者敲代码的时间，特给出验证代码，希望能够促进你的理解。
+
+> Array
+
+```javascript
+    console.log(arr.__proto__)
+    console.log(arr.__proto__ == Array.prototype)   // true 
+    console.log(Array.prototype.__proto__== Object.prototype)  // true 
+    console.log(Object.prototype.__proto__== null)  // true 
+```
+
+> RegExp
+
+```javascript
+    var reg = new RegExp;
+    console.log(reg.__proto__)
+    console.log(reg.__proto__ == RegExp.prototype)  // true 
+    console.log(RegExp.prototype.__proto__== Object.prototype)  // true 
+```
+
+> Date
+
+```javascript
+    var date = new Date;
+    console.log(date.__proto__)
+    console.log(date.__proto__ == Date.prototype)  // true 
+    console.log(Date.prototype.__proto__== Object.prototype)  // true 
+```
+
+> Boolean
+
+```javascript
+    var boo = new Boolean;
+    console.log(boo.__proto__)
+    console.log(boo.__proto__ == Boolean.prototype) // true 
+    console.log(Boolean.prototype.__proto__== Object.prototype) // true 
+```
+
+> Number
+
+```javascript
+    var num = new Number;
+    console.log(num.__proto__)
+    console.log(num.__proto__ == Number.prototype)  // true 
+    console.log(Number.prototype.__proto__== Object.prototype)  // true 
+```
+
+> String
+
+```javascript
+    var str = new String;
+    console.log(str.__proto__)
+    console.log(str.__proto__ == String.prototype)  // true 
+    console.log(String.prototype.__proto__== Object.prototype)  // true 
+```
+
+## 总结
+
+1. 若 `A` 通过`new`创建了`B`,则 `B.__proto__ = A.prototype`；
+
+2. `__proto__`是原型链查找的起点；
+
+3. 执行`B.a`，若在`B`中找不到`a`，则会在`B.__proto__`中，也就是`A.prototype`中查找，若`A.prototype`中仍然没有，则会继续向上查找，最终，一定会找到`Object.prototype`,倘若还找不到，因为`Object.prototype.__proto__`指向`null`，因此会返回`undefined`；
+
+4. 为什么万物皆空，还是那句话，原型链的顶端，一定有`Object.prototype.__proto__ ——> null`。
