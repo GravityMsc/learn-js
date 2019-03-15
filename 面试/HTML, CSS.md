@@ -1,5 +1,3 @@
-## 1. HTML和CSS
-
 ### 1. CSS盒模型
 
 对一个文档进行布局（laying out）的时候，浏览器渲染引擎会根据CSS-box模型将所有元素表示为一个矩形盒子。CSS决定这个盒子的大小，位置以及属性（颜色，背景，边框尺寸）。
@@ -1171,68 +1169,5 @@ flex`可以说是最好的方案了，代码少，使用简单。有朝一日，
 
   这种情况下，默认两种布局方式都不会放不下的div移动到下一行。不过 flex布局可以通过 flex-flow: wrap;来设置多余的div移动到下一行。 grid布局暂不支持。
 
-## 2.JS
 
-类型转换
 
-https://blog.csdn.net/one_and_only4711/article/details/6281581
-
-js常见算法
-
-https://www.cnblogs.com/lvmylife/p/7208541.html
-
-js数组去重
-
-https://www.cnblogs.com/guangyan/articles/6682686.html
-
-js基本数据类型和引用数据类型
-
-https://www.cnblogs.com/cxying93/p/6106469.html
-
-作用域链，闭包
-
-http://web.jobbole.com/90524/
-
-http://web.jobbole.com/90640/?utm_source=blog.jobbole.com&utm_medium=relatedPosts
-
-https://zhuanlan.zhihu.com/p/25855075
-
-原型链
-
-http://web.jobbole.com/91207/
-
-this的指向，apply，call，bind
-
-http://www.cnblogs.com/pssp/p/5216085.html
-
-http://www.cnblogs.com/pssp/p/5787116.html
-
-http://www.cnblogs.com/pssp/p/5781090.html
-
-js事件委托
-
-https://www.cnblogs.com/zhoushengxiu/p/5703095.html
-
-浏览器事件循环
-
-https://www.cnblogs.com/rubyxie/articles/9797564.html
-
-vue面试问题
-
-http://web.jobbole.com/95479/
-
-async，await，promise
-
-http://web.jobbole.com/95515/
-
-ES6：
-
-let，const
-
-class，promise，module，proxy，set，map，
-
-解构赋值，扩展运算符，Object.assign（对象合并）
-
-ES7：
-
- async，await
