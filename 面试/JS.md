@@ -367,6 +367,105 @@ V8后续还引入了延迟清理（lazy sweeping）与增量式整理（incremen
 - 让垃圾回收尽量少地进行，尤其是全堆垃圾回收。这部分我们基本上帮不了什么忙,主要靠v8自己的优化机制.
 - 避免内存泄露,让内存及时得到释放. 这部分是我们需要注意的.具体可以查看,本系列的内存泄露章节,有超详细讲解.
 
+##三、MVC和MVVM的区别
+
+MVC，MVP和MVVM都是常见的软件架构设计模式（Architectural Pattern），它通过分离关注点来改进代码的组织方式。不同于设计模式（Design Pattern），只是为了解决一类问题而总结出的抽象方法，一种架构模式往往使用了多种设计模式。
+
+要了解MVC、MVP和MVVM，就要知道它们的相同点和不同点。不同部分是C(Controller)、P(Presenter)、VM(View-Model)，而相同的部分则是MV(Model-View)。
+
+###MVC模式
+
+**MVC模式（Model–view–controller）:**
+ 是软件工程中的一种软件架构模式，把软件系统分为三个基本部分：模型（Model）、视图（View）和控制器（Controller）。
+
+- 模型（Model） - Model层用于封装和应用程序的业务逻辑相关的数据以及对数据的处理方法。一旦数据发生变化，模型将通知有关的视图。
+- 视图（View） - View作为视图层，主要负责数据的展示,并且响应用户操作.
+- 控制器（Controller）- 控制器是模型和视图之间的纽带，接收View传来的用户事件并且传递给Model，同时利用从Model传来的最新模型控制更新View.
+
+
+
+![img](https://user-gold-cdn.xitu.io/2019/2/21/169102cbc41f9719?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+####**数据关系:**
+
+- View 接受用户交互请求
+- View 将请求转交给Controller
+- Controller 操作Model进行数据更新
+- 数据更新之后，Model通知View更新数据变化.**PS:** 还有一种是View作为Observer监听Model中的任意更新，一旦有更新事件发出，View会自动触发更新以展示最新的Model状态.这种方式提升了整体效率，简化了Controller的功能，不过也导致了View与Model之间的紧耦合。
+- View 更新变化数据
+
+**方式:**
+
+所有方式都是单向通信
+
+####**结构实现:**
+
+- View ：使用 组合(Composite)模式
+- View和Controller：使用 策略(Strategy)模式
+- Model和 View：使用 观察者(Observer)模式同步信息
+
+####**缺点:**
+
+- **View层过重:** View强依赖于Model的,并且可以直接访问Model.所以不可避免的View还要包括一些业务逻辑.导致view过重,后期修改比较困难,且复用程度低.
+- **View层与Controller层也是耦合紧密:** View与Controller虽然看似是相互分离，但却是联系紧密.经常View和Controller一一对应的，捆绑起来作为一个组件使用.解耦程度不足.
+
+###MVVM模式
+
+MVVM是Model-View-ViewModel的简写。由Microsoft提出，并经由Martin Fowler布道传播。在 MVVM 中，不需要Presenter手动地同步View和Model.View 是通过数据驱动的，Model一旦改变就会相应的刷新对应的 View，View 如果改变，也会改变对应的Model。这种方式就可以在业务处理中只关心数据的流转，而无需直接和页面打交道。ViewModel 只关心数据和业务的处理，不关心 View 如何处理数据，在这种情况下，View 和 Model 都可以独立出来，任何一方改变了也不一定需要改变另一方，并且可以将一些可复用的逻辑放在一个 ViewModel 中，让多个 View 复用这个 ViewModel。
+
+- Model - Model层仅仅关注数据本身，不关心任何行为（格式化数据由View负责），这里可以把它理解为一个类似json的数据对象。
+- View - MVVM中的View通过使用模板语法来声明式的将数据渲染进DOM，当ViewModel对Model进行更新的时候，会通过数据绑定更新到View。
+- ViewModel - 类似与Presenter. ViewModel会对View 层的声明进行处理.当 ViewModel 中数据变化，View 层会进行更新;如果是双向绑定,一旦View对绑定的数据进行操作，则ViewModel 中的数据也会进行自动更新.
+
+
+
+![img](https://user-gold-cdn.xitu.io/2019/2/21/169102df8742a9cf?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+####**数据关系:**
+
+- View 接收用户交互请求
+- View 将请求转交给ViewModel
+- ViewModel 操作Model数据更新
+- Model 更新完数据，通知ViewModel数据发生变化
+- ViewModel 更新View数据
+
+**方式:**
+
+双向绑定。View/Model的变动，自动反映在 ViewModel，反之亦然。
+
+####**实现数据绑定的方式：**
+
+- 数据劫持 (Vue)
+- 发布-订阅模式 (Knockout、Backbone)
+- 脏值检查 (旧版Angular)
+
+**使用:**
+
+- 可以兼容你当下使用的 MVC/MVP 框架。
+- 增加你的应用的可测试性。
+- 配合一个绑定机制效果最好。
+
+####**MVVM优点:**
+
+MVVM模式和MVC模式一样，主要目的是分离视图（View）和模型（Model），有几大优点:
+
+- 1,低耦合。View可以独立于Model变化和修改，一个ViewModel可以绑定到不同的”View”上，当View变化的时候Model可以不变，当Model变化的时候View也可以不变。
+- 2,可重用性。你可以把一些视图逻辑放在一个ViewModel里面，让很多view重用这段视图逻辑。
+- 3, 独立开发。开发人员可以专注于业务逻辑和数据的开发（ViewModel），设计人员可以专注于页面设计，生成xml代码。
+- 4, 可测试。界面素来是比较难于测试的，而现在测试可以针对ViewModel来写。
+
+####**MVVM缺点:**
+
+- 类会增多，ViewModel会越加庞大，调用的复杂度增加。
+
+作者：shotCat
+
+链接：https://juejin.im/post/5c6e71216fb9a04a060577da
+
+来源：掘金
+
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+
 类型转换
 
 https://blog.csdn.net/one_and_only4711/article/details/6281581
