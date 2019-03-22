@@ -1,4 +1,4 @@
-### 1. CSS盒模型
+##1. CSS盒模型
 
 对一个文档进行布局（laying out）的时候，浏览器渲染引擎会根据CSS-box模型将所有元素表示为一个矩形盒子。CSS决定这个盒子的大小，位置以及属性（颜色，背景，边框尺寸）。
 
@@ -18,7 +18,7 @@ box-sizing为CSS3属性，IE8+和其他现代浏览器支持。
 
 另外浏览器的标准模式和怪异模式，标准模式时，IE6+和其他现代浏览器会以W3C盒子模型渲染。怪异模式下，IE中只有IE9+会用W3C盒子模型。
 
-###2. JS获取宽高
+##2. JS获取宽高
 
 通过JS获取盒模型对应的宽和高，有以下几种方法：
 
@@ -46,9 +46,7 @@ box-sizing为CSS3属性，IE8+和其他现代浏览器支持。
 
 　　这个就没什么好说的了，最常用的，也是兼容最好的。
 
-
-
-### 3. 边距重叠
+##3. 边距重叠
 
 首先你要知道什么情况下会触发：两个或多个毗邻的普通流中的块元素垂直方向上的 margin 会折叠：
 
@@ -70,7 +68,7 @@ box-sizing为CSS3属性，IE8+和其他现代浏览器支持。
 
 很明显大家可以看出来相邻元素不发生折叠的因素是触发BFC因素的子集，也就是说如果我为上下相邻的元素设置了overflow:hidden，虽然触发了BFC，但是上下元素的上下margin还是会发生折叠
 
-###4. 元素隐藏
+##4. 元素隐藏
 
 1. display:none;
 
@@ -86,7 +84,7 @@ box-sizing为CSS3属性，IE8+和其他现代浏览器支持。
 
    他是把那个层隐藏了，也就是你看不到它的内容但是它内容所占据的空间还是存在的。（看不见但摸得到）
 
-###5. display的属性
+##5. display的属性
 
 我们先来看看常见的四种值：inline,block,inline-block，none.
 
@@ -193,7 +191,7 @@ hidden占实际空间，其后的元素仍在该有的位置，而none后的元�
 
    flex-start（交叉轴的起点对齐），flex-end（交叉轴的终点对齐），center（交叉轴的中点对齐），baseline（项目的第一行文字的基线对齐）
 
-### 6. CSS定位和浮动
+##6. CSS定位和浮动
 
 CSS定位（position）有四种：默认定位（static）、相对定位（relative）、绝对定位（absolute）和固定定位（fixed）
 
@@ -289,6 +287,28 @@ position:relative和负margin都可以使元素位置发生偏移，（都不会
 
 ​                 ![img](https://images2015.cnblogs.com/blog/1088731/201701/1088731-20170106161752191-1450674854.png)![img](https://images2015.cnblogs.com/blog/1088731/201701/1088731-20170106161823769-36206330.png)
 
+**浮动造成的影响**
+
+* 首先元素浮动会影响跟他同级元素的布局
+* 其次会影响父元素容器的高度，正常父元素的高度时自适应的，高度为其包含的内容总高度，而内部元素的浮动会造成父容器高度塌陷（因为元素浮动之后，父元素就不会计算浮动元素的高度了）
+* 父容器高度塌陷了，将会影响和父元素同级的文档布局
+
+怎么解决这个问题呢？
+
+这个问题其实分为两个部分：外部矛盾（即父元素的问题）和内部矛盾（元素本身和同级的元素的问题）。
+
+**解决外部矛盾**
+
+* 第一个是触发bfc，触发bfc后，父元素的高度会包括浮动元素的高度。触发的方式是给父元素设置overflow: auto即可。触发bfc（块级格式上下文）的方法有：1. float的值不是默认值none； 2. position的值不是static或者relative； 3. display的值是inline-block、table-cell、flex、table-caption或者inline-flex； 4. overflow的值不是visible。
+
+* 第二个解决外部矛盾的方法是给父元素增加伪元素:after，给伪元素设置样式clear: both来清除浮动，伪元素清除浮动的核心原理其实是在给父元素增加块级容器，同时对块级容器设置clear属性，使其能够清除自身的浮动，从而正常按照块级容器排列方式那样排列在浮动元素的下面。同时，父元素的同级元素也会正常排列在伪元素形成的块级元素后面，而不受浮动影响。
+
+  给父元素增加一个伪元素来清除浮动的本质，是通过：给父元素再加一个块级子容器，当然这个也就是父元素的最后一个块级子容器了。同时给这个块级子容器设置clear属性来清除其浮动，这样这个子容器就能排列在浮动元素的后面，同时也把父元素的高度撑起来了。那么父元素的同级元素也能正常排列了。所以这个子容器不能有高度和内容，不然会影响父元素的布局。
+
+**解决内部矛盾**
+
+其实，解决内部矛盾的原理和解决外部矛盾的第二种方式的原理是一样的，通过给被浮动影响的第一个元素进行清除浮动，就可以使后面的元素也不会受到浮动影响了。如果在这后面再增加一个浮动元素，可以在此浮动元素后面第一个受影响的元素清除浮动，照此类推。
+
 ####清除浮动的方法
 
 　　如果一个父盒子中有一个子盒子，并且父盒子没有设置高，子盒子在父盒子中进行了浮动，那么将来父盒子的高度为0.由于将来父盒子的高度为0，下面的元素会自动补位，所以这个时候要进行浮动的清除。clear:both
@@ -333,7 +353,7 @@ position:relative和负margin都可以使元素位置发生偏移，（都不会
 }
 ```
 
-### 7. 常用CSS布局
+##7. 常用CSS布局
 
 ####水平垂直居中（感觉总结的并不是很好）
 
@@ -665,7 +685,7 @@ HTML 文件就很普通：
 
 
 
-##### 将左边和右边的子元素像两边移动
+##### 将左边和右边的子元素向两边移动
 
 嗯... 这貌似也不是我们想要的效果，但是，中间的子元素确实是在中间了，那么我们只需要设置相对位置，将左边的子元素和右边的子元素向两边移动就好。
 
@@ -783,7 +803,7 @@ HTML 文件就很普通：
 
 ![双飞翼布局](https://user-gold-cdn.xitu.io/2017/8/20/61d393d131af1b12351d76dd2e2c288c?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
 
-### 8. div水平垂直居中
+##8. div水平垂直居中
 
 **方案一：**
 
@@ -927,7 +947,7 @@ text-align:center,vertical-align: middle;
 }
 ```
 
-###9. 七种实现左侧固定，右侧自适应两栏布局的方法
+##9. 七种实现左侧固定，右侧自适应两栏布局的方法
 
 总结一下左边固定，右边自适应的两栏布局的七种方法。其中有老生常谈的`float`方法,BFC方法，也有CSS3的`flex`布局与`grid`布局。并非所有的布局都会在开发中使用，但是其中也会涉及一些知识点。关于最终的效果，可以查看[这里](https://zhuqingguang.github.io/vac-works/cssLayout/index1.html)
 
@@ -1169,7 +1189,7 @@ flex`可以说是最好的方案了，代码少，使用简单。有朝一日，
 
   这种情况下，默认两种布局方式都不会放不下的div移动到下一行。不过 flex布局可以通过 flex-flow: wrap;来设置多余的div移动到下一行。 grid布局暂不支持。
 
-### 10、HTTP状态码
+##10、HTTP状态码
 
 | 100  | Continue                        | 继续。客户端应继续其请求                                     |
 | ---- | ------------------------------- | ------------------------------------------------------------ |
@@ -1217,3 +1237,155 @@ flex`可以说是最好的方案了，代码少，使用简单。有朝一日，
 | 503  | Service Unavailable             | 由于超载或系统维护，服务器暂时的无法处理客户端的请求。延时的长度可包含在服务器的Retry-After头信息中 |
 | 504  | Gateway Time-out                | 充当网关或代理的服务器，未及时从远端服务器获取请求           |
 | 505  | HTTP Version not supported      | 服务器不支持请求的HTTP协议的版本，无法完成处理               |
+
+##11、伪元素和伪类
+
+概念上区分：
+
+**伪类：**更多的定义的是状态。常见的伪类有:hover, :active, :focus, :visited, :line, :not, :first-child, :last-child等等。
+
+**伪元素：**不存在于DOM树中的虚拟元素，它们可以像正常的html元素一样定义css，但无法使用JavaScript获取。常见的伪元素有 ::before, ::after, ::first-letter, ::first-line等等。
+
+CSS3明确规定，伪类用一个冒号来表示，伪元素用两个冒号来表示，但目前因为兼容性的问题，它们的写法可以是一致的，都用一个冒号就行。
+
+###实战场景——伪类
+
+#### 表单校验
+
+表单的校验中，常会用到 `:required`、`:valid` 和 `:invalid` 这三个伪类。先来看看它们所代表的含义。
+
+- :required，指定具有 required属性 的表单元素
+- :valid，指定一个 匹配指定要求 的表单元素
+- :invalid，指定一个 不匹配指定要求 的表单元素
+
+看下面这个例子：
+
+```html
+<p>input中类型为email的校验</p>
+
+<p>符合email校验规则</p>
+<input type="email" required placeholder="请输入" value="24238477@qq.com" />
+<br><br>
+
+<p>不符合email校验规则</p>
+<input type="email" required placeholder="请输入" value="lalala" />
+<br><br>
+
+<p>有required标识，但未填写</p>
+<input type="email" required placeholder="请输入" value="" />
+
+input {
+    &:valid {
+        border-color: green;
+        box-shadow: inset 5px 0 0 green;
+    }
+    &:invalid {
+        border-color: red;
+        box-shadow: inset 5px 0 0 red;
+    }
+    &:required {
+        border-color: red;
+        box-shadow: inset 5px 0 0 red;
+    }
+}
+```
+
+效果如下：
+
+
+
+![img](https://user-gold-cdn.xitu.io/2019/1/12/1683fe563d44a675?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+
+
+#### 折叠面板
+
+过去，要实现折叠面板的显示或隐藏，只能用JavaScript来搞定。但是现在，可以用伪类 `:target` 来实现。 :target 是文档的内部链接，即 URL 后面跟有锚名称 #，指向文档内某个具体的元素。
+
+看下面这个例子：
+
+```html
+<div class="t-collapse">
+    <!-- 在url最后添加 #modal1，使得target生效 —>
+    <a class="collapse-target" href="#modal1">target 1</a>
+    <div class="collapse-body" id="modal1">
+        <!-- 将url的#modal1 变为 #，使得target失效 —>
+        <a class="collapse-close" href="#">target 1</a>
+        <p>...</p>
+    </div>
+</div>
+
+.t-collapse {
+    >.collapse-body {
+        display: none;
+        &:target {
+            display: block;
+        }
+    }
+}
+
+```
+
+#### 元素的index
+
+当我们要指定一系列标签中的某个元素时，并不需要用JavaScript获取。可以用 `:nth-child(n)` 与 `:nth-of-type(n)` 来找到，并指定样式。但它们有一些小区别，需要注意。
+
+首先，它们的n可以是大于零的数字，或者类似2n+1的表达式，再或者是 even / odd。
+
+另外，还有2个区别：
+
+- :nth-of-type(n) 除了关注n之外，还需要关注最前面的`类型`，也就是标签。
+- :nth-child(n) 它关注的是：其父元素下的第n个孩子，与类型无关。
+
+看下面这个例子，注意两者的差异：
+
+```html
+<h1>这是标题</h1>
+<p>第一个段落。</p>
+<p>第二个段落。</p>
+<p>第三个段落。</p>
+<p>第四个段落。</p>
+<p>第五个段落。</p>
+```
+
+
+
+![img](https://user-gold-cdn.xitu.io/2019/1/12/1683fe60c6b954e0?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+###实战场景——伪元素
+
+#### antd的彩蛋事件
+
+还记得2018年圣诞节的“彩蛋事件”，在整个前端圈，轰动一时。因为按钮上的一朵云，导致不少前端er提前回家过年了。当时，彩蛋事件出现的第一时间，就吓得我赶快打开工程看了一眼，果然也中招了。为了保住饭碗，得赶紧把云朵去掉。
+
+查看了生成的html，发现原来是 button 下藏了一个 `::before`。所以，赶紧把样式覆盖掉，兼容代码如下：
+
+```less
+.ant-btn {
+    &::before {
+        display: none !important;
+    }
+}
+```
+
+#### 美化选中的文本
+
+在网页中，默认的划词效果是，原字色保持不变，划过时的背景变为蓝底色。其实，这是可以用 `::selection` 来进行美化的。看下面这个例子：
+
+```html
+<p>Custom text selection color</p>
+::selection {
+    color: red;
+    background-color: yellow;
+}
+```
+
+效果如下：
+
+
+
+![img](https://user-gold-cdn.xitu.io/2019/1/12/1683fe68dda8e5f0?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+
+
+划过的部分美化为：红色的字体，并且底色变为了黄色。
