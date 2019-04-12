@@ -458,25 +458,2666 @@ MVVM模式和MVC模式一样，主要目的是分离视图（View）和模型（
 
 - 类会增多，ViewModel会越加庞大，调用的复杂度增加。
 
-作者：shotCat
+## 四、this的用法
 
-链接：https://juejin.im/post/5c6e71216fb9a04a060577da
+关于this是面试和日常开发中非常常见的概念之一，也是最易弄混的概念之一，this这个名称本身有时也容易让人迷惑。自己之前面试时在this上也是栽过几次跟头，特地梳理一下，目的是彻底吃透，以绝后患。
 
-来源：掘金
+###常见错误理解
 
-著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+1. **this是指向自身吗？**
+
+   特别是在函数中使用this的时候，this是指的所在的这个函数对象吗？看下面示例：
+
+   ```
+    function test() {
+    	console.log(this.name);
+    }
+    test.name='aaaa';
+    test();
+   复制代码
+   ```
+
+   在上面这个示例里如果this是指向当前函数的话，执行test后是不是应该输出'aaaa'，但实际上输出的是空字符串，因为此时this指向的是window（在浏览器里执行），所以this并不是来指向自身的。（输出的具体原因下面再分析）
+
+2. **this指向函数的作用域吗**
+
+   这个我们同样可以通过代码来验证下，如下：
+
+   ```
+    function test() {
+    	var name = 'bbbbb'
+    	console.log(this.name);
+    }
+    test();
+   复制代码
+   ```
+
+   执行后发现输出的仍然是空字符串，原因和上面一样，this没有指向当前函数的作用域。但this一定会不指向当前函数作用域吗？也不一定，只需知道不能根据所在函数作用域来确定this的指向就对了，应该是确定this的指向，再确定是不是当前函数的作用域。
+
+解决掉常见的理解错误后，我们看下this其实是在运行时（即被调用时）进行绑定的，并不是在声明时绑定，它的上下文取决于函数调用时的各种条件。this 的绑定和函数声明的位置没有任何关系，只取决于函数的调用方式。确定this指向的步骤应该是“确定调用位置->应用规则->确定this指向”。
+
+###寻找调用位置
+
+this既然是函数调用是才绑定的，那么需要首先需要确定函数的调用位置。这个一般是比较容易的，先确认调用栈，然后当前调用栈的前一个就是调用位置了。示例如下：
+
+```
+function a() {
+  // 调用栈是c->b->a, 调用位置b
+  console.log(a);
+}
+
+function b() {
+  // 调用栈是c->b, 调用位置c
+  a()
+}
+
+function c() {
+  // 调用栈是c, 调用位置是全局作用域
+  b();
+}
+c(); // c的调用位置
+复制代码
+```
+
+###应用绑定规则
+
+确定调用位置后，需要应this的绑定规则，有四种绑定规则，判断条件如下：
+
+####默认绑定
+
+一般可以理解为无法应用其他规则时的兜底默认规则，独立函数调用时一般适用。
+
+```
+function test(){
+	console.log(this.a);
+}
+var a = 'aaa'; // 或者window.a='aaa'
+test(); // 输出2
+复制代码
+```
+
+上面这种方式便是默认绑定，test()不在任何对象内的独立调用，适用于默认绑定，**默认绑定this指向的全局对象，在浏览器里面就是window，在node里面就是global， ps：严格模式下，全局对象无法使用默认绑定，默认绑定会绑定到undefined上**
+
+####隐式绑定
+
+隐式绑定存在于在调用位置有上下文对象或者说调用时被对象包含或拥有，示例如下：
+
+```
+const obj = {
+	name: 'oooo',
+	say: function(){
+		console.log(this.name);
+	}
+}
+obj.say();// oooo
+复制代码
+```
+
+看上面函数say的调用，不是say单独调用，而是被对象obj包含着调用，此时this是指向obj对象的。
+
+##### 隐式丢失
+
+有一种情况是看似应该是隐式绑定，但实际却是默认绑定，有两个栗子如下：
+
+```
+栗子one：
+var name = 'globallll';
+var obj = {
+	name: 'oooo',
+	say: function(){
+		console.log(this.name);
+	}
+}
+var copy = obj.say;
+copy();// globallll
+
+栗子two:
+var name = 'globallll';
+var obj = {
+	name: 'oooo',
+	say: function(){
+		console.log(this.name);
+	}
+}
+function b(func){
+	func();
+}
+b(obj.say);// globallll
+复制代码
+```
+
+看起来say函数的确是obj对象的一部分呀，但为什么看起来this是指向的window呢？《you don't know JavaScript》里面把这种特殊对待称为是隐式丢失，但我理解是这种情况是不满足隐式函数绑定的，因为隐式函数绑定应当是调用是被对象包含着调用，而不是说只要是对象的其中一部分就可以了，重点在于调用时是否被函数包含着！
+
+我们来看下上述的两个例子，第一个是把obj里的函数say的引用赋值给copy变量，再通过copy来调用，copy调用时并没有被obj包含着调用，这就适用默认绑定规则--独立函数调用，因此此时this是指向window的。第二个例子同理，只不过看起来是调用的obj.say(),但实际过程是：
+
+```
+	func = obj.say;
+	func();
+复制代码
+```
+
+和第一个一样都有一个赋值的过程。
+
+####显式绑定
+
+首先为啥需要显示绑定呢？因为以上两个规则会导致this的指向不稳定，但有时我们需要函数中this稳定指向某个对象的。比如下面这个：
+
+```
+var obj = {
+	name: 'ooooo',
+	say: function(){
+		console.log(this.name);
+	}
+}
+var name = 'globalllll';
+setTimeout(obj.say, 1000); // globalllll
+复制代码
+```
+
+这个例子中我们其实是想让this指向obj然后输出‘ooooo’的，但实际上调用的过程中首先进行了赋值然后进行了调用，导致使用默认绑定，this指向了window。为了能固定this的绑定，才有了显示绑定。
+
+显示绑定有三种方式：apply，call和bind。这三个函数大家应该用的比较多了，其中apply和call只有传参的区别，而apply和bind的区别在于apply绑定后立即执行，而bind可以返回绑定后的函数。上述例子可以这么解决：
+
+```
+var obj = {
+	name: 'ooooo',
+	say: function(){
+		console.log(this.name);
+	}
+}
+var test = obj.say.bind(obj);//绑定后this指向不可修改
+//或者
+//var test = function (){
+//	obj.say.call(obj);
+//}
+var name = 'globalllll';
+setTimeout(test, 1000); // oooo
+复制代码
+```
+
+思考🤔：如何用apply或者call实现bind？
+
+进阶：实现apply？
+
+####new绑定
+
+new是一个由类新建示例的过程。使用new时会调用构造函数，但是过程中并不是实例化了一些类，而是通过新建一个对象，然后执行原型的链接，新对象绑定函数调用的this，返回这个对象，返回的这个对象我们就称为一个实例。比如： function Person(name){ this.name = name; } var student = new Person('LiMing'); console.log(student.name) // LiMing
+
+上述代码的过程是：
+
+1. 新建一个对象
+2. 执行原型的链接（不是本文的重点）
+3. 将新建对象绑定到Person中的this上，也就是目前this指向新建对象
+4. 返回这个新建对象给student，即student等于新建对象
+
+这种在new的过程中绑定this的方式称为是new绑定。
+
+###优先级
+
+上面我们了解四种绑定规则，但问题是如果符合其中一种以上的情形时应该如果确定是哪种呢？这就要确定四种规则的优先级了。优先级如下： new	绑定>显式绑定>隐式绑定>默认绑定。
+
+###特殊情况
+
+凡事有例外，this也一样。下面介绍下特殊情况。
+
+#### 箭头函数
+
+es6中引入的箭头函数虽然也叫函数，但是却不适用于上面的四规则。先引入一个🌰：
+
+```
+function a(){
+	return ()=>{
+		console.log(this.name);
+	}
+}
+const obj1={
+	name: 11111,
+}
+const obj2={
+	name: 22222,
+}
+var test = a.call(obj1);
+test.call(obj2); // 11111
+复制代码
+```
+
+上面例子中箭头函数理论上绑定的是obj2，但是实际输出的却是11111。所以箭头函数是不适用于上面的四规则的。箭头函数的具体规则时：箭头函数this是在声明时就确定了，其this就是声明时所在作用域的this确定的。比如上面的例子，箭头函数是在a函数中声明的，所以箭头函数中所用的this就是a的this，而a中的this是根据调用位置和规则确定是obj1，所以箭头函数中this也是指向obj1。
+
+
+
+##五、Call，Apply，Bind的用法
+
+###call 和 apply 的共同点
+
+它们的共同点是，都能够**改变函数执行时的上下文**，将一个对象的方法交给另一个对象来执行，并且是立即执行的。
+
+为何要改变执行上下文？举一个生活中的小例子：平时没时间做饭的我，周末想给孩子炖个腌笃鲜尝尝。但是没有适合的锅，而我又不想出去买。所以就问邻居借了一个锅来用，这样既达到了目的，又节省了开支，一举两得。
+
+改变执行上下文也是一样的，A 对象有一个方法，而 B 对象因为某种原因，也需要用到同样的方法，那么这时候我们是单独为 B 对象扩展一个方法呢，还是借用一下 A 对象的方法呢？当然是借用 A 对象的啦，既完成了需求，又减少了内存的占用。
+
+另外，它们的写法也很类似，**调用 call 和 apply 的对象，必须是一个函数 Function**。接下来，就会说到具体的写法，那也是它们区别的主要体现。
+
+###call 和 apply 的区别
+
+它们的区别，主要体现在参数的写法上。先来看一下它们各自的具体写法。
+
+#### call 的写法
+
+```
+Function.call(obj,[param1[,param2[,…[,paramN]]]])
+复制代码
+```
+
+需要注意以下几点：
+
+- 调用 call 的对象，必须是个函数 Function。
+- call 的第一个参数，是一个对象。 Function 的调用者，将会指向这个对象。如果不传，则默认为全局对象 window。
+- 第二个参数开始，可以接收任意个参数。每个参数会映射到相应位置的 Function 的参数上。但是如果将所有的参数作为数组传入，它们会作为一个整体映射到 Function 对应的第一个参数上，之后参数都为空。
+
+```
+function func (a,b,c) {}
+
+func.call(obj, 1,2,3)
+// func 接收到的参数实际上是 1,2,3
+
+func.call(obj, [1,2,3])
+// func 接收到的参数实际上是 [1,2,3],undefined,undefined
+复制代码
+```
+
+#### apply 的写法
+
+```
+Function.apply(obj[,argArray])
+复制代码
+```
+
+需要注意的是：
+
+- 它的调用者必须是函数 Function，并且只接收两个参数，第一个参数的规则与 call 一致。
+- 第二个参数，必须是数组或者类数组，它们会被转换成类数组，传入 Function 中，并且会被映射到 Function 对应的参数上。这也是 call 和 apply 之间，很重要的一个区别。
+
+```
+func.apply(obj, [1,2,3])
+// func 接收到的参数实际上是 1,2,3
+
+func.apply(obj, {
+    0: 1,
+    1: 2,
+    2: 3,
+    length: 3
+})
+// func 接收到的参数实际上是 1,2,3
+复制代码
+```
+
+#### 什么是类数组？
+
+先说数组，这我们都熟悉。它的特征有：可以通过角标调用，如 array[0]；具有长度属性length；可以通过 for 循环或forEach方法，进行遍历。
+
+那么，类数组是什么呢？顾名思义，就是**具备与数组特征类似的对象**。比如，下面的这个对象，就是一个类数组。
+
+```
+let arrayLike = {
+    0: 1,
+    1: 2,
+    2: 3,
+    length: 3
+};
+复制代码
+```
+
+类数组 arrayLike 可以通过角标进行调用，具有length属性，同时也可以通过 for 循环进行遍历。
+
+类数组，还是比较常用的，只是我们平时可能没注意到。比如，我们获取 DOM 节点的方法，返回的就是一个类数组。再比如，在一个方法中使用 arguments 获取到的所有参数，也是一个类数组。
+
+但是需要注意的是：**类数组无法使用 forEach、splice、push 等数组原型链上的方法**，毕竟它不是真正的数组。
+
+###call 和 apply 的用途
+
+下面会分别列举 call 和 apply 的一些使用场景。声明：例子中没有哪个场景是必须用 call 或者必须用 apply 的，只是个人习惯这么用而已。
+
+#### call 的使用场景
+
+**1、对象的继承**。如下面这个例子：
+
+```
+function superClass () {
+    this.a = 1;
+    this.print = function () {
+        console.log(this.a);
+    }
+}
+
+function subClass () {
+    superClass.call(this);
+    this.print();
+}
+
+subClass();
+// 1
+复制代码
+```
+
+subClass 通过 call 方法，继承了 superClass 的 print 方法和 a 变量。此外，subClass 还可以扩展自己的其他方法。
+
+**2、借用方法**。还记得刚才的类数组么？如果它想使用 Array 原型链上的方法，可以这样：
+
+```
+let domNodes = Array.prototype.slice.call(document.getElementsByTagName("*"));
+复制代码
+```
+
+这样，domNodes 就可以应用 Array 下的所有方法了。
+
+#### apply 的一些妙用
+
+**1、Math.max**。用它来获取数组中最大的一项。
+
+```
+let max = Math.max.apply(null, array);
+复制代码
+```
+
+同理，要获取数组中最小的一项，可以这样：
+
+```
+let min = Math.min.apply(null, array);
+复制代码
+```
+
+**2、实现两个数组合并**。在 ES6 的扩展运算符出现之前，我们可以用 Array.prototype.push来实现。
+
+```
+let arr1 = [1, 2, 3];
+let arr2 = [4, 5, 6];
+
+Array.prototype.push.apply(arr1, arr2);
+console.log(arr1); // [1, 2, 3, 4, 5, 6]
+复制代码
+```
+
+###bind 的使用
+
+最后来说说 bind。在 MDN 上的解释是：bind() 方法创建一个新的函数，在调用时设置 this 关键字为提供的值。并在调用新函数时，将给定参数列表作为原函数的参数序列的前若干项。
+
+它的语法如下：
+
+```
+Function.bind(thisArg[, arg1[, arg2[, ...]]])
+复制代码
+```
+
+bind 方法 与 apply 和 call 比较类似，也能改变函数体内的 this 指向。不同的是，**bind 方法的返回值是函数，并且需要稍后调用，才会执行**。而 apply 和 call 则是立即调用。
+
+来看下面这个例子：
+
+```
+function add (a, b) {
+    return a + b;
+}
+
+function sub (a, b) {
+    return a - b;
+}
+
+add.bind(sub, 5, 3); // 这时，并不会返回 8
+add.bind(sub, 5, 3)(); // 调用后，返回 8
+复制代码
+```
+
+如果 bind 的第一个参数是 null 或者 undefined，this 就指向全局对象 window。
+
+###总结
+
+call 和 apply 的主要作用，是改变对象的执行上下文，并且是立即执行的。它们在参数上的写法略有区别。
+
+bind 也能改变对象的执行上下文，它与 call 和 apply 不同的是，返回值是一个函数，并且需要稍后再调用一下，才会执行。
+
+最后，分享一个在知乎上看到的，关于 call 和 apply 的便捷记忆法：
+
+> 猫吃鱼，狗吃肉，奥特曼打小怪兽。
+>
+> 有天狗想吃鱼了
+>
+> 猫.吃鱼.call(狗，鱼)
+>
+> 狗就吃到鱼了
+>
+> 猫成精了，想打怪兽
+>
+> 奥特曼.打小怪兽.call(猫，小怪兽)
+>
+> 猫也可以打小怪兽了
+
+## 六、算法
+
+### 判断一个单词是否是回文
+
+回文是指把相同的词汇或句子，在下文中调换位置或颠倒过来，产生首尾回环的情趣，叫做回文，也叫回环。比如 mamam redivider .
+
+很多人拿到这样的题目非常容易想到用for 将字符串颠倒字母顺序然后匹配就行了。其实重要的考察的就是对于reverse的实现。其实我们可以利用现成的函数，将字符串转换成数组，这个思路很重要，我们可以拥有更多的自由度去进行字符串的一些操作。
+
+```javascript
+function checkPalindrom(str) {  
+    return str == str.split('').reverse().join('');
+}
+```
+
+### 去掉一组整型数组重复的值
+
+比如 输入: [1,13,24,11,11,14,1,2]，  输出: [1,13,24,11,14,2] ，需要去掉重复的11 和 1 这两个元素。
+
+主要考察个人对Object的使用，利用key来进行筛选。
+
+[![复制代码](https://common.cnblogs.com/images/copycode.gif)](javascript:void(0);)
+
+```javascript
+**
+* unique an array 
+**/
+let unique = function(arr) {  
+  let hashTable = {};
+  let data = [];
+  for(let i=0,l=arr.length;i<l;i++) {
+    if(!hashTable[arr[i]]) {
+      hashTable[arr[i]] = true;
+      data.push(arr[i]);
+    }
+  }
+  return data
+
+}
+
+module.exports = unique;  
+```
+
+###去掉非整型数组重复的值
+
+假如数组并不是整型数组该如何去除重复呢？
+
+假设有一个这样的数组： `let originalArray = [1, '1', '1', 2, true, 'true', false, false, null, null, {}, {}, 'abc', 'abc', undefined, undefined, NaN, NaN];`。后面的方法中的源数组，都是指的这个。
+
+#### 1、ES6 的 Set 对象
+
+ES6 提供了新的数据结构 Set。它类似于数组，但是成员的值都是唯一的，没有重复的值。Set 本身是一个构造函数，用来生成 Set 数据结构。
+
+```javascript
+let resultArr = Array.from(new Set(originalArray));
+
+// 或者用扩展运算符
+let resultArr = [...new Set(originalArray)];
+
+console.log(resultArr);
+// [1, "1", 2, true, "true", false, null, {…}, {…}, "abc", undefined, NaN]
+```
+
+Set 并不是真正的数组，这里的 `Array.from` 和 `...` 都可以将 Set 数据结构，转换成最终的结果数组。
+
+这是最简单快捷的去重方法，但是细心的同学会发现，这里的 `{}` 没有去重。可是又转念一想，2 个空对象的地址并不相同，所以这里并没有问题，结果 ok。
+
+#### 2、Map 的 has 方法
+
+把源数组的每一个元素作为 key 存到 Map 中。由于 Map 中不会出现相同的 key 值，所以最终得到的就是去重后的结果。
+
+```javascript
+const resultArr = new Array();
+
+for (let i = 0; i < originalArray.length; i++) {
+    // 没有该 key 值
+    if (!map.has(originalArray[i])) {
+        map.set(originalArray[i], true);
+        resultArr.push(originalArray[i]);
+    }
+}
+
+console.log(resultArr);
+// [1, "1", 2, true, "true", false, null, {…}, {…}, "abc", undefined, NaN]
+```
+
+但是它与 Set 的数据结构比较相似，结果 ok。
+
+#### 3、indexOf 和 includes
+
+建立一个新的空数组，遍历源数组，往这个空数组里塞值，每次 push 之前，先判断是否已有相同的值。
+
+判断的方法有 2 个：indexOf 和 includes，但它们的结果之间有细微的差别。先看 indexOf。
+
+```javascript
+const resultArr = [];
+for (let i = 0; i < originalArray.length; i++) {
+    if (resultArr.indexOf(originalArray[i]) < 0) {
+        resultArr.push(originalArray[i]);
+    }
+}
+console.log(resultArr);
+// [1, "1", 2, true, "true", false, null, {…}, {…}, "abc", undefined, NaN, NaN]
+```
+
+indexOf 并不没处理 `NaN`。
+
+再来看 includes，它是在 ES7 中正式提出的。
+
+```javascript
+const resultArr = [];
+for (let i = 0; i < originalArray.length; i++) {
+    if (!resultArr.includes(originalArray[i])) {
+        resultArr.push(originalArray[i]);
+    }
+}
+console.log(resultArr);
+// [1, "1", 2, true, "true", false, null, {…}, {…}, "abc", undefined, NaN]
+```
+
+includes 处理了 `NaN`，结果 ok。
+
+#### 4、sort
+
+先将原数组排序，生成新的数组，然后遍历排序后的数组，相邻的两两进行比较，如果不同则存入新数组。
+
+```javascript
+const sortedArr = originalArray.sort();
+
+const resultArr = [sortedArr[0]];
+
+for (let i = 1; i < sortedArr.length; i++) {
+    if (sortedArr[i] !== resultArr[resultArr.length - 1]) {
+        resultArr.push(sortedArr[i]);
+    }
+}
+console.log(resultArr);
+// [1, "1", 2, NaN, NaN, {…}, {…}, "abc", false, null, true, "true", undefined]
+```
+
+从结果可以看出，对源数组进行了排序。但同样的没有处理 `NaN`。
+
+#### 5、双层 for 循环 + splice
+
+双层循环，外层遍历源数组，内层从 i+1 开始遍历比较，相同时删除这个值。
+
+```javascript
+for (let i = 0; i < originalArray.length; i++) {
+    for (let j = (i + 1); j < originalArray.length; j++) {
+        // 第一个等于第二个，splice去掉第二个
+        if (originalArray[i] === originalArray[j]) {
+            originalArray.splice(j, 1);
+            j--;
+        }
+    }
+}
+
+console.log(originalArray);
+// [1, "1", 2, true, "true", false, null, {…}, {…}, "abc", undefined, NaN, NaN]
+```
+
+splice 方法会修改源数组，所以这里我们并没有新开空数组去存储，最终输出的是修改之后的源数组。但同样的没有处理 `NaN`。
+
+#### 6、原始去重
+
+定义一个新数组，并存放原数组的第一个元素，然后将源数组一一和新数组的元素对比，若不同则存放在新数组中。
+
+```javascript
+let resultArr = [originalArray[0]];
+for(var i = 1; i < originalArray.length; i++){
+    var repeat = false;
+    for(var j=0; j < resultArr.length; j++){
+        if(originalArray[i] === resultArr[j]){
+            repeat = true;
+            break;
+        }
+    }
+
+    if(!repeat){
+       resultArr.push(originalArray[i]);
+    }
+}
+console.log(resultArr);
+// [1, "1", 2, true, "true", false, null, {…}, {…}, "abc", undefined, NaN, NaN]
+```
+
+这是最原始的去重方法，很好理解，但写法繁琐。同样的没有处理 `NaN`。
+
+#### 7、ES5 的 reduce
+
+reduce 是 ES5 中方法，常用于值的累加。它的语法：
+
+```javascript
+arr.reduce(callback[, initialValue])
+```
+
+reduce 的第一个参数是一个 callback，callback 中的参数分别为： Accumulator(累加器)、currentValue(当前正在处理的元素)、currentIndex(当前正在处理的元素索引，可选)、array(调用 reduce 的数组，可选)。
+
+reduce 的第二个参数，是作为第一次调用 callback 函数时的第一个参数的值。如果没有提供初始值，则将使用数组中的第一个元素。
+
+利用 reduce 的特性，再结合之前的 includes(也可以用 indexOf)，就能得到新的去重方法：
+
+```javascript
+const reducer = (acc, cur) => acc.includes(cur) ? acc : [...acc, cur];
+
+const resultArr = originalArray.reduce(reducer, []);
+
+console.log(resultArr);
+// [1, "1", 2, true, "true", false, null, {…}, {…}, "abc", undefined, NaN]
+```
+
+这里的 `[]` 就是初始值(initialValue)。acc 是累加器，在这里的作用是将没有重复的值塞入新数组（它一开始是空的）。 reduce 的写法很简单，但需要多加理解。它可以处理 `NaN`，结果 ok。
+
+#### 8、对象的属性
+
+每次取出原数组的元素，然后在对象中访问这个属性，如果存在就说明重复。
+
+```javascript
+const resultArr = [];
+const obj = {};
+for(let i = 0; i < originalArray.length; i++){
+    if(!obj[originalArray[i]]){
+        resultArr.push(originalArray[i]);
+        obj[originalArray[i]] = 1;
+    }
+}
+console.log(resultArr);
+// [1, 2, true, false, null, {…}, "abc", undefined, NaN]
+```
+
+但这种方法有缺陷。从结果看，它貌似只关心值，不关注类型。还把 {} 给处理了，但这不是正统的处理办法，所以 **不推荐使用**。
+
+#### 9、filter + hasOwnProperty
+
+filter 方法会返回一个新的数组，新数组中的元素，通过 hasOwnProperty 来检查是否为符合条件的元素。
+
+```javascript
+const obj = {};
+const resultArr = originalArray.filter(function (item) {
+    return obj.hasOwnProperty(typeof item + item) ? false : (obj[typeof item + item] = true);
+});
+
+console.log(resultArr);
+// [1, "1", 2, true, "true", false, null, {…}, "abc", undefined, NaN]
+```
+
+这 `貌似` 是目前看来最完美的解决方案了。这里稍加解释一下：
+
+- hasOwnProperty 方法会返回一个布尔值，指示对象自身属性中是否具有指定的属性。
+- `typeof item + item` 的写法，是为了保证值相同，但类型不同的元素被保留下来。例如：第一个元素为 number1，第二第三个元素都是 string1，所以第三个元素就被去除了。
+- `obj[typeof item + item] = true` 如果 hasOwnProperty 没有找到该属性，则往 obj 里塞键值对进去，以此作为下次循环的判断依据。
+- 如果 hasOwnProperty 没有检测到重复的属性，则告诉 filter 方法可以先积攒着，最后一起输出。
+
+`看似` 完美解决了我们源数组的去重问题，但在实际的开发中，一般不会给两个空对象给我们去重。所以稍加改变源数组，给两个空对象中加入键值对。
+
+```javascript
+let originalArray = [1, '1', '1', 2, true, 'true', false, false, null, null, {a: 1}, {a: 2}, 'abc', 'abc', undefined, undefined, NaN, NaN];
+```
+
+然后再用 filter + hasOwnProperty 去重。
+
+然而，结果竟然把 `{a: 2}` 给去除了！！！这就不对了。
+
+所以，这种方法有点去重 `过头` 了，也是存在问题的。
+
+#### 10、lodash 中的 _.uniq
+
+灵机一动，让我想到了 lodash 的去重方法 _.uniq，那就尝试一把：
+
+```javascript
+console.log(_.uniq(originalArray));
+
+// [1, "1", 2, true, "true", false, null, {…}, {…}, "abc", undefined, NaN]
+```
+
+用法很简单，可以在实际工作中正确处理去重问题。
+
+然后，我在好奇心促使下，看了它的源码，指向了 baseUniq 文件，它的源码如下：
+
+```javascript
+function baseUniq(array, iteratee, comparator) {
+  let index = -1
+  let includes = arrayIncludes
+  let isCommon = true
+
+  const { length } = array
+  const result = []
+  let seen = result
+
+  if (comparator) {
+    isCommon = false
+    includes = arrayIncludesWith
+  }
+  else if (length >= LARGE_ARRAY_SIZE) {
+    const set = iteratee ? null : createSet(array)
+    if (set) {
+      return setToArray(set)
+    }
+    isCommon = false
+    includes = cacheHas
+    seen = new SetCache
+  }
+  else {
+    seen = iteratee ? [] : result
+  }
+  outer:
+  while (++index < length) {
+    let value = array[index]
+    const computed = iteratee ? iteratee(value) : value
+
+    value = (comparator || value !== 0) ? value : 0
+    if (isCommon && computed === computed) {
+      let seenIndex = seen.length
+      while (seenIndex--) {
+        if (seen[seenIndex] === computed) {
+          continue outer
+        }
+      }
+      if (iteratee) {
+        seen.push(computed)
+      }
+      result.push(value)
+    }
+    else if (!includes(seen, computed, comparator)) {
+      if (seen !== result) {
+        seen.push(computed)
+      }
+      result.push(value)
+    }
+  }
+  return result
+}
+```
+
+有比较多的干扰项，那是为了兼容另外两个方法，_.uniqBy 和 _.uniqWith。去除掉之后，就会更容易发现它是用 while 做了循环。当遇到相同的值得时候，continue outer 再次进入循环进行比较，将没有重复的值塞进 result 里，最终输出。
+
+另外，_.uniqBy 方法可以通过指定 key，来专门去重对象列表。
+
+```javascript
+_.uniqBy([{ 'x': 1 }, { 'x': 2 }, { 'x': 1 }], 'x');
+// => [{ 'x': 1 }, { 'x': 2 }]
+```
+
+_.uniqWith 方法可以完全地给对象中所有的键值对，进行比较。
+
+```javascript
+var objects = [{ 'x': 1, 'y': 2 }, { 'x': 2, 'y': 1 }, { 'x': 1, 'y': 2 }];
+
+_.uniqWith(objects, _.isEqual);
+// => [{ 'x': 1, 'y': 2 }, { 'x': 2, 'y': 1 }]
+```
+
+这两个方法，都还挺实用的。
+
+
+
+
+
+### 统计一个字符串出现最多的字符
+
+给出一段英文连续的英文字符窜，找出重复出现次数最多的字母
+
+**比如：** 输入：afjghdfraaaasdenas  输出 ： a
+
+前面出现过去重的算法，这里需要是统计重复次数。
+
+[![复制代码](https://common.cnblogs.com/images/copycode.gif)](javascript:void(0);)
+
+```javascript
+function findMaxDuplicateChar(str) {  
+  if(str.length == 1) {
+    return str;
+  }
+  let charObj = {};
+  for(let i=0;i<str.length;i++) {
+    if(!charObj[str.charAt(i)]) {
+      charObj[str.charAt(i)] = 1;
+    }else{
+      charObj[str.charAt(i)] += 1;
+    }
+  }
+  let maxChar = '',
+      maxValue = 1;
+  for(var k in charObj) {
+    if(charObj[k] >= maxValue) {
+      maxChar = k;
+      maxValue = charObj[k];
+    }
+  }
+  return maxChar;
+
+}
+
+module.exports = findMaxDuplicateChar;  
+```
+
+### 排序算法
+
+#### 1.冒泡排序
+
+如果说到算法题目的话，应该大多都是比较开放的题目，不限定算法的实现，但是一定要求掌握其中的几种，所以冒泡排序，这种较为基础并且便于理解记忆的算法一定需要熟记于心。冒泡排序算法就是依次比较大小，小的的大的进行位置上的交换。
+
+[![复制代码](https://common.cnblogs.com/images/copycode.gif)](javascript:void(0);)
+
+```javascript
+function bubbleSort(arr) {  
+    for(let i = 0,l=arr.length;i<l-1;i++) {
+        for(let j = i+1;j<l;j++) { 
+          if(arr[i]>arr[j]) {
+                let tem = arr[i];
+                arr[i] = arr[j];
+                arr[j] = tem;
+            }
+        }
+    }
+    return arr;
+}
+module.exports = bubbleSort;  
+```
+
+#### 2.选择排序
+
+算法参考某个元素值，将小于它的值，放到左数组中，大于它的值的元素就放到右数组中，然后递归进行上一次左右数组的操作，返回合并的数组就是已经排好顺序的数组了。
+
+[![复制代码](https://common.cnblogs.com/images/copycode.gif)](javascript:void(0);)
+
+```javascript
+function quickSort(arr) {
+
+    if(arr.length<=1) {
+        return arr;
+    }
+
+    let leftArr = [];
+    let rightArr = [];
+    let q = arr[0];
+    for(let i = 1,l=arr.length; i<l; i++) {
+        if(arr[i]>q) {
+            rightArr.push(arr[i]);
+        }else{
+            leftArr.push(arr[i]);
+        }
+    }
+
+    return [].concat(quickSort(leftArr),[q],quickSort(rightArr));
+}
+
+module.exports = quickSort; 
+```
+
+[HTML5 Canvas Demo: Sorting Algorithms](http://math.hws.edu/eck/jsdemo/sortlab.html)，用动画演示算法。
+
+####3.插入排序（Insertion Sort）
+
+#####算法描述
+
+插入排序（Insertion-Sort）的算法描述是一种简单直观的排序算法。它的工作原理是通过构建有序序列，对于未排序数据，在已排序序列中**从后向前扫描**，找到相应位置并插入。插入排序在实现上，通常采用in-place排序（即只需用到O(1)的额外空间的排序），因而在从后向前扫描过程中，需要反复把已排序元素逐步向后挪位，为最新元素提供插入空间。
+
+插入排序核心--扑克牌思想： 就想着自己在打扑克牌，接起来第一张，放哪里无所谓，再接起来一张，比第一张小，放左边，继续接，可能是中间数，就插在中间.后面起的牌从后向前依次比较,并插入.
+
+
+
+![插入排序](https://user-gold-cdn.xitu.io/2019/2/24/1691df9f6afc4b04?imageslim)
+
+#####算法步骤及实现代码
+
+**思路:** 插入排序也属于基本排序算法,**大致思路也是两层循环嵌套**.首先,按照其扑克牌的思路.将要排序的数列分为两部分.左边为有序数列(起在手中的牌),刚开始为空.右边部分为待排序的数列(即乱序的扑克牌).
+
+有了上面大致思想后,开始设置循环.首先外循环为你需要起多少张牌.那是多少?毫无疑问就是数列的长度,但是为了方便,我们可以默认让数列第一个数作为有序数列,可以减少一次循环.故外循环次数为数列长度减1;内循环则循环有序数列,并从右往左,比较大小,将较小数插在前面(结合动图)
+
+**步骤:**
+
+- 1.从第一个元素开始，该元素可以认为已经被排序；
+- 2.取出下一个元素，在已经排序的元素序列中从后向前扫描；
+- 3.如果该元素（已排序）大于新元素，将该元素移到下一位置；
+- 4.重复步骤3，直到找到已排序的元素小于或者等于新元素的位置；
+- 5.将新元素插入到该位置后；
+- 6.重复步骤2~5。
+
+**JS代码实现:**
+
+```
+function insertSort(arr) {
+    for(let i = 1; i < arr.length; i++) {  //外循环从1开始，默认arr[0]是有序段
+        for(let j = i; j > 0; j--) {  //j = i,表示此时你起在手上的那张牌,将arr[j]依次比较插入有序段中
+            if(arr[j] < arr[j-1]) {
+                [arr[j],arr[j-1]] = [arr[j-1],arr[j]];  //其实这里内循环中,只要比它前一个数小就交换,直到没有更小的,就break退出.这和动图表示的插入还是有点区别的,但最后结果其实是一样的.
+            } else {
+                break;
+            }
+        }
+    }
+    return arr;
+}
+var arr=[3,44,38,5,47,15,36,26,27,2,46,4,19,50,48];
+console.log(insertSort(arr));//[2, 3, 4, 5, 15, 19, 26, 27, 36, 38, 44, 46, 47, 48, 50]
+复制代码
+```
+
+####4.快速排序（Quick Sort）
+
+#####算法描述
+
+快速排序的名字起的是简单粗暴，因为一听到这个名字你就知道它存在的意义，就是快，而且效率高! 它是处理**大数据**最快的排序算法之一了。
+
+它是在冒泡排序基础上的递归分治法。通过递归的方式将数据依次分解为包含较小元素和较大元素的不同子序列。该算法不断重复这个步骤直至所有数据都是有序的。
+
+**注意:** 快速排序也是面试是**最最最容易考到的算法题**,经常就会让你进行手写.
+
+
+
+![快速排序](https://user-gold-cdn.xitu.io/2019/2/24/1691dfaa8bbf0e52?imageslim)
+
+#####算法步骤及实现代码
+
+**思路:** 快速排序属于高级排序算法,此时就不是相似的循环嵌套.它的大概思想就是: 找到一个数作为参考，比这个数字大的放在数字左边，比它小的放在右边； 然后分别再对左边和右变的序列做相同的操作(递归).
+
+**注意:** **涉及到递归的算法,一定要记得设置出口,跳出递归!**
+
+**步骤:**
+
+- 1.从数列中挑出一个元素，称为 “基准”（pivot）;
+- 2.重新排序数列，所有元素比基准值小的摆放在基准前面，所有元素比基准值大的摆在基准的后面（相同的数可以到任一边）。在这个分区退出之后，该基准就处于数列的中间位置。这个称为分区（partition）操作；
+- 3.递归地（recursive）把小于基准值元素的子数列和大于基准值元素的子数列排序；
+
+**JS代码实现:**
+
+```
+function quickSort (arr) {
+	if(arr.length <= 1) {
+        return arr;  //递归出口
+    }
+	let left = [],
+        right = [],
+		//这里我们默认选择数组第一个为基准,PS:其实这样偷懒是不好的,如果数组是已经排好序了的.则很有可能变成最差情况的时间复杂度
+		//pivotIndex = Math.floor(arr.length / 2),
+	    pivot = arr[0];    //阮一峰版:  arr.splice(pivotIndex, 1)[0];   使用splice在大量数据时,会消耗大量内存;但也不至于被喷得一无是处! 它的思路是没有任何问题的! 
+	for (var i = 1; i < arr.length; i++) {
+		if (arr[i] < pivot) {
+			left.push(arr[i])
+		} else {
+			right.push(arr[i])
+		}
+	}
+	//concat也不适合大量数据的排序,会消耗大量内存
+	return quickSort(left).concat(pivot, quickSort(right))
+}
+var arr=[3,44,38,5,47,15,36,26,27,2,46,4,19,50,48];
+console.log(quickSort(arr));//[2, 3, 4, 5, 15, 19, 26, 27, 36, 38, 44, 46, 47, 48, 50]
+
+//改进版:
+function partition2(arr, low, high) {
+  let pivot = arr[low];
+  while (low < high) {
+    while (low < high && arr[high] > pivot) {
+      --high;
+    }
+    arr[low] = arr[high];
+    while (low < high && arr[low] <= pivot) {
+      ++low;
+    }
+    arr[high] = arr[low];
+  }
+  arr[low] = pivot;
+  return low;
+}
+
+function quickSort2(arr, low, high) {
+  if (low < high) {
+    let pivot = partition2(arr, low, high);
+    quickSort2(arr, low, pivot - 1);
+    quickSort2(arr, pivot + 1, high);
+  }
+  return arr;
+}
+var arr=[3,44,38,5,47,15,36,26,27,2,46,4,19,50,48];
+console.log(quickSort2(arr,0,arr.length-1));//[2, 3, 4, 5, 15, 19, 26, 27, 36, 38, 44, 46, 47, 48, 50]
+复制代码
+```
+
+####5.希尔排序（Shell Sort）
+
+#####算法描述
+
+1959年Shell发明； 第一个突破O(n^2)的排序算法；**是简单插入排序的改进版；它与插入排序的不同之处在于，它会优先比较距离较远的元素。** 希尔排序又叫缩小增量排序.并且排序也是不稳定的
+
+希尔排序是基于插入排序的以下两点性质而提出改进方法的：
+
+- 插入排序在对几乎已经排好序的数据操作时，效率高，即可以达到线性排序的效率；
+- 但插入排序一般来说是低效的，因为插入排序每次只能将数据移动一位；
+
+希尔排序的基本思想是：先将整个待排序的记录序列分割成为若干子序列分别进行直接插入排序，待整个序列中的记录“基本有序”时，再对全体记录进行依次直接插入排序。
+
+#####算法步骤及实现代码
+
+**思路:**  希尔排序其实大体思路很简单,就是将数组(长度为len)分成间隔为t1的若干数组.进行插入排序;排完后,将数组再分成间隔为t2(逐步减小)的若干数组,进行插入排序;然后继续上述操作,直到分成间隔为1的数组,再进行最后一次插入排序则完成.
+
+方便理解可以查看下图:
+
+
+
+![img](https://user-gold-cdn.xitu.io/2019/2/24/1691dfc27c806ac3?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+
+
+**步骤:**
+
+- 1,选择一个增量序列t1，t2，…，tk，其中ti>tj，tk=1；
+- 2,按增量序列个数k，对序列进行k 趟排序；
+- 3,每趟排序，根据对应的增量ti，将待排序列分割成若干长度为m 的子序列，分别对各子表进行直接插入排序。仅增量因子为1 时，整个序列作为一个表来处理，表长度即为整个序列的长度。
+
+**JS代码实现:**
+
+```
+function shellSort(arr) {
+    var len = arr.length,
+        temp,
+        gap = 1;
+    while(gap < len/5) {          //动态定义间隔序列
+        gap =gap*5+1;
+    }
+    for (gap; gap > 0; gap = Math.floor(gap/5)) {
+        for (var i = gap; i < len; i++) {
+            temp = arr[i];
+            for (var j = i-gap; j >= 0 && arr[j] > temp; j-=gap) {
+                arr[j+gap] = arr[j];
+            }
+            arr[j+gap] = temp;
+        }
+    }
+    return arr;
+}
+var arr=[3,44,38,5,47,15,36,26,27,2,46,4,19,50,48];
+console.log(shellSort(arr));//[2, 3, 4, 5, 15, 19, 26, 27, 36, 38, 44, 46, 47, 48, 50]
+
+复制代码
+```
+
+####6.归并排序（Merge Sort）
+
+#####算法描述
+
+归并排序（Merge sort）是建立在归并操作上的一种有效的排序算法。该算法是**采用分治法**（Divide and Conquer）的一个非常典型的应用。
+
+归并排序是一种稳定的排序方法。将已有序的子序列合并，得到完全有序的序列；即先使每个子序列有序，再使子序列段间有序。若将两个有序表合并成一个有序表，称为2-路归并。
+
+
+
+![归并排序](data:image/svg+xml;utf8,<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="811" height="505"></svg>)
+
+#####算法步骤及实现代码
+
+**思路:** 将数组分为左和右两部分,然后继续将左右两部分继续(递归)拆分,直到拆分成单个为止;然后将拆分为最小的两个数组,进行比较,合并排成一个数组.接着继续递归比较合并.直到最后合并为一个数组.
+
+**步骤:**
+
+- 1.把长度为n的输入序列分成两个长度为n/2的子序列；
+- 2.对这两个子序列分别采用归并排序；
+- 3.将两个排序好的子序列合并成一个最终的排序序列。
+
+**JS代码实现:**
+
+```
+function mergeSort(arr) {  //采用自上而下的递归方法
+    var len = arr.length;
+    if(len < 2) {
+        return arr;
+    }
+    var middle = Math.floor(len / 2),
+        left = arr.slice(0, middle),
+        right = arr.slice(middle);
+    return merge(mergeSort(left), mergeSort(right));
+}
+
+function merge(left, right){
+    var result = [];
+    while (left.length && right.length) {
+        if (left[0] <= right[0]) {
+            result.push(left.shift());
+        } else {
+            result.push(right.shift());
+        }
+    }
+
+    while (left.length)
+        result.push(left.shift());
+
+    while (right.length)
+        result.push(right.shift());
+    return result;
+}
+var arr=[3,44,38,5,47,15,36,26,27,2,46,4,19,50,48];
+console.log(mergeSort(arr));//[2, 3, 4, 5, 15, 19, 26, 27, 36, 38, 44, 46, 47, 48, 50]
+复制代码
+```
+
+####7.堆排序（Heap Sort）
+
+#####算法描述
+
+堆排序（Heapsort）是指利用堆这种数据结构所设计的一种排序算法。堆积是一个近似完全二叉树的结构，并同时满足堆积的性质：即子结点的键值或索引总是小于（或者大于）它的父节点。堆排序可以说是一种利用堆的概念来排序的选择排序。分为两种方法：
+
+- 大顶堆：每个节点的值都大于或等于其子节点的值，在堆排序算法中用于升序排列；
+- 小顶堆：每个节点的值都小于或等于其子节点的值，在堆排序算法中用于降序排列；
+
+
+
+![归并排序](https://user-gold-cdn.xitu.io/2019/2/24/1691dfd711a56f14?imageslim)
+
+
+
+**步骤:**
+
+- 1.将初始待排序关键字序列(R1,R2....Rn)构建成大顶堆，此堆为初始的无序区；
+- 2.将堆顶元素R[1]与最后一个元素R[n]交换，此时得到新的无序区(R1,R2,......Rn-1)和新的有序区(Rn),且满足R[1,2...n-1]<=R[n]；
+- 3.由于交换后新的堆顶R[1]可能违反堆的性质，因此需要对当前无序区(R1,R2,......Rn-1)调整为新堆，然后再次将R[1]与无序区最后一个元素交换，得到新的无序区(R1,R2....Rn-2)和新的有序区(Rn-1,Rn)。不断重复此过程直到有序区的元素个数为n-1，则整个排序过程完成。
+
+**JS代码实现:**
+
+```
+function buildMaxHeap(arr,len) {   // 建立大顶堆
+    
+    for (var i = Math.floor(len/2); i >= 0; i--) {
+        heapify(arr, i,len);
+    }
+}
+
+function heapify(arr, i,len) {     // 堆调整
+    var left = 2 * i + 1,
+        right = 2 * i + 2,
+        largest = i;
+
+    if (left < len && arr[left] > arr[largest]) {
+        largest = left;
+    }
+
+    if (right < len && arr[right] > arr[largest]) {
+        largest = right;
+    }
+
+    if (largest != i) {
+        swap(arr, i, largest);
+        heapify(arr, largest,len);
+    }
+}
+
+function swap(arr, i, j) {
+    var temp = arr[i];
+    arr[i] = arr[j];
+    arr[j] = temp;
+}
+
+function heapSort(arr) {
+    var len = arr.length;
+    buildMaxHeap(arr,len);
+
+    for (var i = arr.length-1; i > 0; i--) {
+        swap(arr, 0, i);
+        len--;
+        heapify(arr, 0,len);
+    }
+    return arr;
+}
+var arr=[3,44,38,5,47,15,36,26,27,2,46,4,19,50,48];
+console.log(heapSort(arr));//[2, 3, 4, 5, 15, 19, 26, 27, 36, 38, 44, 46, 47, 48, 50]
+复制代码
+```
+
+####8.计数排序（Counting Sort）
+
+#####算法描述
+
+计数排序几乎是唯一一个不基于比较的排序算法, 该算法于1954年由 Harold H. Seward 提出. 使用它处理一定范围内的整数排序时, 时间复杂度为O(n+k), 其中k是整数的范围, 它几乎比任何基于比较的排序算法都要快`( 只有当O(k)>O(n*log(n))的时候其效率反而不如基于比较的排序, 如归并排序和堆排序)`.
+
+计数排序的核心在于将输入的数据值转化为键存储在**额外开辟的数组空间中。**
+
+
+
+![计数排序](https://user-gold-cdn.xitu.io/2019/2/24/1691dfde0eaa754a?imageslim)
+
+#####算法步骤及实现代码
+
+**思路:** 计数排序利用了一个特性, 对于数组的某个元素, 一旦知道了有多少个其它元素比它小(假设为m个), 那么就可以确定出该元素的正确位置(第m+1位)
+
+**步骤:**
+
+- 1, 获取待排序数组A的最大值, 最小值.
+- 2, 将最大值与最小值的差值+1作为长度新建计数数组B，并将相同元素的数量作为值存入计数数组.
+- 3, 对计数数组B累加计数, 存储不同值的初始下标.
+- 4, 从原数组A挨个取值, 赋值给一个新的数组C相应的下标, 最终返回数组C.
+
+注意: **如果原数组A是包含若干个对象的数组，需要基于对象的某个属性进行排序，那么算法开始时，需要将原数组A处理为一个只包含对象属性值的简单数组simpleA, 接下来便基于simpleA进行计数、累加计数, 其它同上.**
+
+**JS代码实现:**
+
+```
+//以下实现不仅支持了数值序列的排序，还支持根据对象的某个属性值来排序。
+function countSort(array, keyName){
+  var length = array.length,
+      output = new Array(length),
+      max,
+      min,
+      simpleArray = keyName ? array.map(function(v){
+        return v[keyName];
+      }) : array; // 如果keyName是存在的，那么就创建一个只有keyValue的简单数组
+
+  // 获取最大最小值
+  max = min = simpleArray[0];
+  simpleArray.forEach(function(v){
+    v > max && (max = v);
+    v < min && (min = v);
+  });
+  // 获取计数数组的长度
+  var k = max - min + 1;
+  // 新建并初始化计数数组
+  var countArray = new Array(k);
+  simpleArray.forEach(function(v){
+    countArray[v - min]= (countArray[v - min] || 0) + 1;
+  });
+  // 累加计数，存储不同值的初始下标
+  countArray.reduce(function(prev, current, i, arr){
+    arr[i] = prev;
+    return prev + current;
+  }, 0);
+  // 从原数组挨个取值(因取的是原数组的相应值，只能通过遍历原数组来实现)
+  simpleArray.forEach(function(v, i){
+    var j = countArray[v - min]++;
+    output[j] = array[i];
+  });
+  return output;
+}
+var arr=[3,44,38,5,47,15,36,26,27,2,46,4,19,50,48];
+console.log(countSort(arr));//[2, 3, 4, 5, 15, 19, 26, 27, 36, 38, 44, 46, 47, 48, 50]
+复制代码
+```
+
+####9.桶排序（Bucket Sort）
+
+#####算法描述
+
+桶排序是计数排序的升级版。它利用了函数的映射关系，高效与否的关键就在于这个映射函数的确定。为了使桶排序更加高效，我们需要做到这两点：
+
+- 在额外空间充足的情况下，尽量增大桶的数量
+- 使用的映射函数能够将输入的 N 个数据均匀的分配到 K 个桶中
+
+同时，对于桶中元素的排序，选择何种比较排序算法对于性能的影响至关重要。很显然，桶划分的越小，各个桶之间的数据越少，排序所用的时间也会越少。但相应的空间消耗就会增大。
+
+
+
+![桶排序](https://user-gold-cdn.xitu.io/2019/2/24/1691dfe4be472342?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+#####算法步骤及实现代码
+
+**思路:** 桶排序 (Bucket sort)的工作的原理：假设输入数据服从均匀分布，将数据分到有限数量的桶里，每个桶再分别排序（有可能再使用别的排序算法或是以递归方式继续使用桶排序进行排
+
+**步骤:**
+
+- 1.设置一个定量的数组当作空桶；
+- 2.遍历输入数据，并且把数据一个一个放到对应的桶里去；
+- 3.对每个不是空的桶进行排序；
+- 4.从不是空的桶里把排好序的数据拼接起来。
+
+注意: **如果原数组A是包含若干个对象的数组，需要基于对象的某个属性进行排序，那么算法开始时，需要将原数组A处理为一个只包含对象属性值的简单数组simpleA, 接下来便基于simpleA进行计数、累加计数, 其它同上.**
+
+**JS代码实现:**
+
+```
+function bucketSort(arr, bucketSize) {
+    if (arr.length === 0) {
+      return arr;
+    }
+
+    var i;
+    var minValue = arr[0];
+    var maxValue = arr[0];
+    for (i = 1; i < arr.length; i++) {
+      if (arr[i] < minValue) {
+          minValue = arr[i];                // 输入数据的最小值
+      } else if (arr[i] > maxValue) {
+          maxValue = arr[i];                // 输入数据的最大值
+      }
+    }
+
+    //桶的初始化
+    var DEFAULT_BUCKET_SIZE = 5;            // 设置桶的默认数量为5
+    bucketSize = bucketSize || DEFAULT_BUCKET_SIZE;
+    var bucketCount = Math.floor((maxValue - minValue) / bucketSize) + 1;   
+    var buckets = new Array(bucketCount);
+    for (i = 0; i < buckets.length; i++) {
+        buckets[i] = [];
+    }
+
+    //利用映射函数将数据分配到各个桶中
+    for (i = 0; i < arr.length; i++) {
+        buckets[Math.floor((arr[i] - minValue) / bucketSize)].push(arr[i]);
+    }
+
+    arr.length = 0;
+    for (i = 0; i < buckets.length; i++) {
+        insertionSort(buckets[i]);                      // 对每个桶进行排序，这里使用了插入排序
+        for (var j = 0; j < buckets[i].length; j++) {
+            arr.push(buckets[i][j]);                      
+        }
+    }
+
+    return arr;
+}
+var arr=[3,44,38,5,47,15,36,26,27,2,46,4,19,50,48];
+console.log(bucketSort(arr));//[2, 3, 4, 5, 15, 19, 26, 27, 36, 38, 44, 46, 47, 48, 50]
+复制代码
+```
+
+####10.基数排序（Radix Sort）
+
+#####算法描述
+
+基数排序是一种非比较型整数排序算法，其原理是将整数按位数切割成不同的数字，然后按每个位数分别比较。由于整数也可以表达字符串（比如名字或日期）和特定格式的浮点数，所以基数排序也不是只能使用于整数。
+
+按照优先从高位或低位来排序有两种实现方案:
+
+- MSD: 由高位为基底, 先按k1排序分组, 同一组中记录, 关键码k1相等, 再对各组按k2排序分成子组, 之后, 对后面的关键码继续这样的排序分组, 直到按最次位关键码kd对各子组排序后. 再将各组连接起来, 便得到一个有序序列. MSD方式适用于位数多的序列.
+- LSD: 由低位为基底, 先从kd开始排序，再对kd-1进行排序，依次重复，直到对k1排序后便得到一个有序序列. LSD方式适用于位数少的序列.
+
+基数排序,计数排序,桶排序.这三种排序算法都利用了桶的概念，但对桶的使用方法上有明显差异：
+
+- 基数排序：根据键值的每位数字来分配桶；
+- 计数排序：每个桶只存储单一键值；
+- 桶排序：每个桶存储一定范围的数值；
+
+
+
+![基数排序](https://user-gold-cdn.xitu.io/2019/2/24/1691dfecee7659e2?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+#####算法步骤及实现代码
+
+**步骤:**
+
+- 1.取得数组中的最大数，并取得位数；
+- 2.arr为原始数组，从最低位开始取每个位组成radix数组；
+- 3.对radix进行计数排序（利用计数排序适用于小范围数的特点）；
+
+**JS代码实现:**
+
+```
+/**
+ * 基数排序适用于：
+ *  (1)数据范围较小，建议在小于1000
+ *  (2)每个数值都要大于等于0
+ * @author xiazdong
+ * @param  arr 待排序数组
+ * @param  maxDigit 最大位数
+ */
+//LSD Radix Sort
+
+function radixSort(arr, maxDigit) {
+    var mod = 10;
+    var dev = 1;
+    var counter = [];
+    console.time('基数排序耗时');
+    for (var i = 0; i < maxDigit; i++, dev *= 10, mod *= 10) {
+        for(var j = 0; j < arr.length; j++) {
+            var bucket = parseInt((arr[j] % mod) / dev);
+            if(counter[bucket]== null) {
+                counter[bucket] = [];
+            }
+            counter[bucket].push(arr[j]);
+        }
+        var pos = 0;
+        for(var j = 0; j < counter.length; j++) {
+            var value = null;
+            if(counter[j]!=null) {
+                while ((value = counter[j].shift()) != null) {
+                      arr[pos++] = value;
+                }
+          }
+        }
+    }
+    console.timeEnd('基数排序耗时');
+    return arr;
+}
+var arr = [3, 44, 38, 5, 47, 15, 36, 26, 27, 2, 46, 4, 19, 50, 48];
+console.log(radixSort(arr,2)); //[2, 3, 4, 5, 15, 19, 26, 27, 36, 38, 44, 46, 47, 48, 50]
+复制代码
+```
+
+####11.二叉树和二叉查找树
+
+#####**树**
+
+树是一种非顺序数据结构，一种分层数据的抽象模型，它对于存储需要快速查找的数据非常有用。
+
+现实生活中最常见的树的例子是家谱，或是公司的组织架构图.
+
+一个树结构包含一系列存在父子关系的节点。每个节点都有一个父节点（除了顶部的第一个 节点）以及零个或多个子节点.
+
+**树常见结构/属性：**
+
+- 节点 
+  - 根节点
+  - 内部节点：非根节点、且有子节点的节点
+  - 外部节点/页节点：无子节点的节点
+- 子树：就是大大小小节点组成的树
+- 深度：节点到根节点的节点数量
+- 高度：树的高度取决于所有节点深度中的最大值
+- 层级：也可以按照节点级别来分层
+
+#####**二叉树**
+
+二叉树，是一种特殊的树，即子节点最多只有两个，这个限制可以使得写出高效的插入、删除、和查找数据。在二叉树中，子节点分别叫左节点和右节点。
+
+
+
+![二叉树](https://user-gold-cdn.xitu.io/2019/2/24/1691e0043526d05f?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+#####**二叉查找树**
+
+二叉查找树是一种特殊的二叉树，**相对较小的值保存在左节点中，较大的值（或者等于）保存在右节点中，这一特性使得查找的效率很高，对于数值型和非数值型数据，比如字母和字符串，都是如此。** 现在通过JS实现一个二叉查找树。
+
+**节点:**
+
+二叉树的最小元素是节点，所以先定义一个节点
+
+```
+function Node(data,left,right) {
+    this.left = left;
+    this.right = right;
+    this.data = data;
+    this.show = () => {return this.data}
+}
+复制代码
+```
+
+这个就是二叉树的最小结构单元
+
+**二叉树**
+
+```
+function BST() {
+    this.root = null //初始化,root为null
+}
+
+复制代码
+```
+
+BST初始化时，只有一个根节点，且没有任何数据。 接下来，我们利用二叉查找树的规则，定义一个插入方法，这个方法的基本思想是:
+
+1. 如果`BST.root === null` ，那么就将节点作为根节点
+2. 如果`BST.root !==null` ，将插入节点进行一个比较，小于根节点，拿到左边的节点，否则拿右边，再次比较、递归。
+
+这里就出现了递归了，因为，总是要把较小的放在靠左的分支。换言之
+
+**最左变的叶子节点是最小的数，最右的叶子节点是最大的数**
+
+```
+function insert(data) {
+    var node = new Node(data,null,null);
+    if(this.root === null) {
+        this.root = node
+    } else {
+        var current = this.root;
+        var parent;
+        while(true) {
+            parent = current;
+            if(data < current.data) {
+                current = current.left; //到左子树
+                if(current === null) {  //如果左子树为空，说明可以将node插入在这里
+                    parent.left = node;
+                    break;  //跳出while循环
+                }
+            } else {
+                current = current.right;
+                if(current === null) {
+                    parent.right = node;
+                    break;
+                }
+            }
+        }
+    }
+}
+复制代码
+```
+
+这里，是使用了一个循环方法，不断的去向子树寻找正确的位置。 循环和递归都有一个核心，就是找到出口，这里的出口就是当current 为null的时候，代表没有内容，可以插入。
+
+接下来，将此方法写入BST即可:
+
+```
+function BST() {
+    this.root = null;
+    this.insert = insert;
+}
+复制代码
+```
+
+这样子，就可以使用二叉树这个自建的数据结构了:
+
+```
+var bst = new BST()；
+bst.insert(10);
+bst.insert(8);
+bst.insert(2);
+bst.insert(7);
+bst.insert(5);
+复制代码
+复制代码
+```
+
+但是这个时候，想要看树中的数据，不是那么清晰，所以接下来，就要用到遍历了。
+
+**树的遍历:**
+
+按照根节点访问的顺序不同，树的遍历分为以下三种：
+
+- 前序遍历 (根节点->左子树->右子树)
+- 中序遍历 (左子树->根节点->右子树)
+- 后序遍历 (左子树->右子树->根节点)
+
+**先序遍历:**
+
+先序遍历是以优先于后代节点的顺序访问每个节点的。先序遍历的一种应用是打印一个结构化的文档。
+
+
+
+![先序遍历](https://user-gold-cdn.xitu.io/2019/2/24/1691e00c3d7c8b47?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+
+
+```
+function preOrder(node) {
+    if(node !== null) {
+        //根节点->左子树->右子树
+        console.log(node.show());
+        preOrder(node.left);
+        preOrder(node.right);
+    }
+}
+复制代码
+```
+
+**中序遍历:**
+
+中序遍历是以从最小到最大的顺序访 问所有节点。中序遍历的一种应用就是对树进行排序操作。
+
+
+
+![中序遍历](https://user-gold-cdn.xitu.io/2019/2/24/1691e011441b61ab?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+
+
+```
+function inOrder(node) {
+    if(node !== null) {
+        //如果不是null，就一直查找左变，因此递归
+		//左子树->根节点->右子树
+        inOrder(node.left);
+        //递归结束，打印当前值
+        console.log(node.show());
+        //上一次递归已经把左边搞完了，右边
+        inOrder(node.right);
+    }
+}
+复制代码
+```
+
+**后序遍历:**
+
+后序遍历则是先访问节点的后代节点，再访问节点本身。后序遍历的一种应用是计算一个目录和它的子目录中所有文件所占空间的大小。
+
+
+
+![后序遍历](https://user-gold-cdn.xitu.io/2019/2/24/1691e0164e731d33?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+
+
+```
+function postOrder(node) {
+    if(node !== null) {
+        //左子树->右子树->根节点
+        postOrder(node.left);
+        postOrder(node.right);
+        console.log(node.show())
+    }
+}
+复制代码
+```
+
+#####二叉树的查找
+
+在二叉树这种数据结构中进行数据查找是最方便的：
+
+- 最小值： 最左子树的叶子节点
+- 最大值： 最右子树的叶子节点
+- 特定值： target与current进行比较，如果比current大，在current.right进行查找，反之类似。
+
+清楚思路后，就动手来写：
+
+```
+//最小值
+function getMin(bst) {
+    var current = bst.root;
+    while(current.left !== null) {
+        current = current.left;
+    }
+    return current.data;
+}
+
+//最大值
+function getMax(bst) {
+    var current = bst.root;
+    while(current.right !== null) {
+        current = current.right;
+    }
+    return current.data;
+}
+复制代码
+```
+
+最大、最小值都是非常简单的，下面主要看下如何通过
+
+```
+function find(target,bst) {
+    var current = bst.root;
+    while(current !== null) {
+        if(target === current.data) {
+            return true;
+        }
+        else if(target > current.data) {
+            current = current.right;
+        } else if(target < current.data) {
+            current = current.left;
+        }
+    }
+    return -1;
+}
+复制代码
+```
+
+其实核心，仍然是通过一个循环和判断，来不断的向下去寻找，这里的思想其实和二分查找是有点类似的。
+
+#####AVL树：
+
+AVL树是一种自平衡二叉搜索树，AVL树本质上是带了平衡功能的二叉查找树（二叉排序树，二叉搜索树），在AVL树中任何节点的两个子树的高度最大差别为一，也就是说这种树会在添加或移除节点时尽量试着成为一棵完全树，所以它也被称为高度平衡树。查找、插入和删除在平均和最坏情况下都是 `O（log n）`，增加和删除可能需要通过一次或多次树旋转来重新平衡这个树。
+
+#####红黑树：
+
+红黑树和AVL树类似，都是在进行插入和删除操作时通过特定操作保持二叉查找树的平衡，从而获得较高的查找性能；它虽然是复杂的，但它的最坏情况运行时间也是非常良好的，并且在实践中是高效的：它可以在`O(log n)`时间内做查找，插入和删除，这里的 n 是树中元素的数目。
+
+红黑树是每个节点都带有颜色属性的二叉查找树，颜色或红色或黑色。在二叉查找树强制一般要求以外，对于任何有效的红黑树我们增加了如下的额外要求：
+
+- 节点是红色或黑色
+- 根节点是黑色
+- 每个叶节点（NIL节点，空节点）是黑色的
+- 每个红色节点的两个子节点都是黑色。(从每个叶子到根的所有路径上不能有两个连续的红色节点)
+- 从任一节点到其每个叶子的所有路径都包含相同数目的黑色节点
+
+这些约束强制了红黑树的关键性质：从根到叶子的最长的可能路径不多于最短的可能路径的两倍长。结果是这个树大致上是平衡的。因为操作比如插入、删除和查找某个值的最坏情况时间都要求与树的高度成比例，这个在高度上的理论上限允许红黑树在最坏情况下都是高效的，而不同于普通的二叉查找树。
+
+红黑树和AVL树一样都对插入时间、删除时间和查找时间提供了最好可能的最坏情况担保。这不只是使它们在时间敏感的应用如即时应用(real time application)中有价值，而且使它们有在提供最坏情况担保的其他数据结构中作为建造板块的价值；例如，在计算几何中使用的很多数据结构都可以基于红黑树。 红黑树在函数式编程中也特别有用，在这里它们是最常用的持久数据结构之一，它们用来构造关联数组和集合，在突变之后它们能保持为以前的版本。除了`O(log n)`的时间之外，红黑树的持久版本对每次插入或删除需要`O(log n)`的空间。
+
+### 不借助临时变量，进行两个整数的交换
+
+**举例：**输入 a = 2, b = 4 输出 a = 4, b =2
+
+　　这种问题非常巧妙，需要大家跳出惯有的思维，利用 a , b进行置换。
+
+　　主要是利用 + - 去进行运算，类似 a = a + ( b - a) 实际上等同于最后 的 a = b;
+
+[![复制代码](https://common.cnblogs.com/images/copycode.gif)](javascript:void(0);)
+
+```javascript
+function swap(a , b) {  
+  b = b - a;
+  a = a + b;
+  b = a - b;
+  return [a,b];
+}
+
+module.exports = swap;  
+```
+
+### 使用canvas绘制一个有限度的斐波那契数列的曲线
+
+![斐波那契数列曲线](https://images2015.cnblogs.com/blog/738658/201707/738658-20170719222015693-961565046.png)
+
+数列长度限定在9.
+
+`斐波那契数列`，又称黄金分割数列，指的是这样一个数列：0、1、1、2、3、5、8、13、21、34、……在数学上，斐波纳契数列主要考察递归的调用。我们一般都知道定义
+
+```
+fibo[i] = fibo[i-1]+fibo[i-2];  
+```
+
+生成斐波那契数组的方法
+
+```javascript
+function getFibonacci(n) {  
+  var fibarr = [];
+  var i = 0;
+  while(i<n) {
+    if(i<=1) {
+      fibarr.push(i);
+    }else{
+      fibarr.push(fibarr[i-1] + fibarr[i-2])
+    }
+    i++;
+  }
+
+  return fibarr;
+}
+```
+
+剩余的工作就是利用canvas `arc`方法进行曲线绘制了。
+
+### 找出数组的最大差值
+
+**比如：** 输入 [10,5,11,7,8,9]  输出 6
+
+这是通过一道题目去测试对于基本的数组的最大值的查找，很明显我们知道，最大差值肯定是一个数组中最大值与最小值的差。
+
+```javascript
+function getMaxProfit(arr) {
+
+    var minPrice = arr[0];
+    var maxProfit = 0;
+
+    for (var i = 0; i < arr.length; i++) {
+        var currentPrice = arr[i];
+
+        minPrice = Math.min(minPrice, currentPrice);
+
+        var potentialProfit = currentPrice - minPrice;
+
+        maxProfit = Math.max(maxProfit, potentialProfit);
+    }
+
+    return maxProfit;
+}
+```
+
+### 随机生成指定长度的字符串
+
+实现一个算法，随机生成指制定长度的字符窜。
+
+**比如：**给定 长度 8 输出 4ldkfg9j
+
+```javascript
+function randomString(n) {  
+  let str = 'abcdefghijklmnopqrstuvwxyz9876543210';
+  let tmp = '',
+      i = 0,
+      l = str.length;
+  for (i = 0; i < n; i++) {
+    tmp += str.charAt(Math.floor(Math.random() * l));
+  }
+  return tmp;
+}
+
+module.exports = randomString;  
+```
+
+### 实现类似getElementsByClassName的功能
+
+自己实现一个函数，查找某个DOM节点下面的包含某个class的所有DOM节点？不允许使用原生提供的 getElementsByClassName querySelectorAll 等原生提供DOM查找函数。
+
+```javascript
+function queryClassName(node, name) {  
+  var starts = '(^|[ \n\r\t\f])',
+       ends = '([ \n\r\t\f]|$)';
+  var array = [],
+        regex = new RegExp(starts + name + ends),
+        elements = node.getElementsByTagName("*"),
+        length = elements.length,
+        i = 0,
+        element;
+
+    while (i < length) {
+        element = elements[i];
+        if (regex.test(element.className)) {
+            array.push(element);
+        }
+
+        i += 1;
+    }
+
+    return array;
+}
+```
+
+### 使用JS实现二叉查找树（Binary Search Tree）
+
+一般叫全部写完的概率比较少，但是重点考察你对它的理解和一些基本特点的实现。 二叉查找树，也称二叉搜索树、有序二叉树（英语：ordered binary tree）是指一棵空树或者具有下列性质的二叉树：
+
+- 任意节点的左子树不空，则左子树上所有结点的值均小于它的根结点的值；
+- 任意节点的右子树不空，则右子树上所有结点的值均大于它的根结点的值；
+- 任意节点的左、右子树也分别为二叉查找树；
+- 没有键值相等的节点。二叉查找树相比于其他数据结构的优势在于查找、插入的时间复杂度较低。为O(log n)。二叉查找树是基础性数据结构，用于构建更为抽象的数据结构，如集合、multiset、关联数组等。
+
+![img](https://images2015.cnblogs.com/blog/738658/201707/738658-20170719222527693-1678554844.png)
+
+ 
+
+  在写的时候需要足够理解二叉搜素树的特点，需要先设定好每个节点的数据结构
+
+```
+class Node {  
+  constructor(data, left, right) {
+    this.data = data;
+    this.left = left;
+    this.right = right;
+  }
+}
+```
+
+树是有节点构成，由根节点逐渐延生到各个子节点，因此它具备基本的结构就是具备一个根节点，具备添加，查找和删除节点的方法.
+
+```javascript
+class BinarySearchTree {
+
+  constructor() {
+    this.root = null;
+  }
+
+  insert(data) {
+    let n = new Node(data, null, null);
+    if (!this.root) {
+      return this.root = n;
+    }
+    let currentNode = this.root;
+    let parent = null;
+    while (1) {
+      parent = currentNode;
+      if (data < currentNode.data) {
+        currentNode = currentNode.left;
+        if (currentNode === null) {
+          parent.left = n;
+          break;
+        }
+      } else {
+        currentNode = currentNode.right;
+        if (currentNode === null) {
+          parent.right = n;
+          break;
+        }
+      }
+    }
+  }
+
+  remove(data) {
+    this.root = this.removeNode(this.root, data)
+  }
+
+  removeNode(node, data) {
+    if (node == null) {
+      return null;
+    }
+
+    if (data == node.data) {
+      // no children node
+      if (node.left == null && node.right == null) {
+        return null;
+      }
+      if (node.left == null) {
+        return node.right;
+      }
+      if (node.right == null) {
+        return node.left;
+      }
+
+      let getSmallest = function(node) {
+        if(node.left === null && node.right == null) {
+          return node;
+        }
+        if(node.left != null) {
+          return node.left;
+        }
+        if(node.right !== null) {
+          return getSmallest(node.right);
+        }
+
+      }
+      let temNode = getSmallest(node.right);
+      node.data = temNode.data;
+      node.right = this.removeNode(temNode.right,temNode.data);
+      return node;
+
+    } else if (data < node.data) {
+      node.left = this.removeNode(node.left,data);
+      return node;
+    } else {
+      node.right = this.removeNode(node.right,data);
+      return node;
+    }
+  }
+
+  find(data) {
+    var current = this.root;
+    while (current != null) {
+      if (data == current.data) {
+        break;
+      }
+      if (data < current.data) {
+        current = current.left;
+      } else {
+        current = current.right
+      }
+    }
+    return current.data;
+  }
+
+}
+
+module.exports = BinarySearchTree;  
+```
+
+## 七、柯里化
+
+最近，朋友T 在准备面试，他为一道编程题所困，向我求助。原题如下：
+
+```
+// 写一个 sum 方法，当使用下面的语法调用时，能正常工作
+console.log(sum(2, 3)); // Outputs 5
+console.log(sum(2)(3)); // Outputs 5
+复制代码
+```
+
+这道题要考察的，就是对函数柯里化的理解。让我们先来解析一下题目的要求：
+
+- 如果传递两个参数，我们只需将它们相加并返回。
+- 否则，我们假设它是以sum(2)(3)的形式被调用的，所以我们返回一个匿名函数，它将传递给sum()（在本例中为2）的参数和传递给匿名函数的参数（在本例中为3）。
+
+所以，sum 函数可以这样写：
+
+```
+function sum (x) {
+    if (arguments.length == 2) {
+        return arguments[0] + arguments[1];
+    }
+    
+    return function(y) {
+        return x + y;
+    }
+}
+复制代码
+```
+
+arguments 的用法挺灵活的，在这里它则用于分割两种不同的情况。当参数只有一个的时候，进行柯里化的处理。
+
+那么，到底什么是函数的柯里化呢？接下来，我们将从概念出发，探究函数柯里化的实现与用途。
+
+###什么是柯里化
+
+柯里化，是函数式编程的一个重要概念。它既能减少代码冗余，也能增加可读性。另外，附带着还能用来装逼。
+
+先给出柯里化的定义：在数学和计算机科学中，柯里化是一种将使用多个参数的一个函数转换成一系列使用一个参数的函数的技术。
+
+柯里化的定义，理解起来有点费劲。为了更好地理解，先看下面这个例子：
+
+```
+function sum (a, b, c) {
+    console.log(a + b + c);
+}
+sum(1, 2, 3); // 6
+复制代码
+```
+
+毫无疑问，sum 是个简单的累加函数，接受3个参数，输出累加的结果。
+
+假设有这样的需求，sum的前2个参数保持不变，最后一个参数可以随意。那么就会想到，在函数内，是否可以把前2个参数的相加过程，给抽离出来，因为参数都是相同的，没必要每次都做运算。
+
+如果先不管函数内的具体实现，调用的写法可以是这样： `sum(1, 2)(3);` 或这样 `sum(1, 2)(10);` 。就是，先把前2个参数的运算结果拿到后，再与第3个参数相加。
+
+这其实就是函数柯里化的简单应用。
+
+###柯里化的实现
+
+`sum(1, 2)(3);` 这样的写法，并不常见。拆开来看，`sum(1, 2)` 返回的应该还是个函数，因为后面还有 `(3)` 需要执行。
+
+那么反过来，从最后一个参数，从右往左看，它的左侧必然是一个函数。以此类推，如果前面有n个()，那就是有n个函数返回了结果，只是返回的结果，还是一个函数。是不是有点递归的意思？
+
+网上有一些不同的柯里化的实现方式，以下是个人觉得最容易理解的写法：
+
+```
+function curry (fn, currArgs) {
+    return function() {
+        let args = [].slice.call(arguments);
+
+        // 首次调用时，若未提供最后一个参数currArgs，则不用进行args的拼接
+        if (currArgs !== undefined) {
+            args = args.concat(currArgs);
+        }
+
+        // 递归调用
+        if (args.length < fn.length) {
+            return curry(fn, args);
+        }
+
+        // 递归出口
+        return fn.apply(null, args);
+    }
+}
+复制代码
+```
+
+解析一下 curry 函数的写法：
+
+首先，它有 2 个参数，fn 指的就是本文一开始的源处理函数 `sum`。currArgs 是调用 curry 时传入的参数列表，比如 `(1, 2)(3)` 这样的。
+
+再看到 curry 函数内部，它会整个返回一个匿名函数。
+
+再接下来的 `let args = [].slice.call(arguments);`，意思是将 arguments 数组化。arguments 是一个类数组的结构，它并不是一个真的数组，所以没法使用数组的方法。我们用了 call 的方法，就能愉快地对 args 使用数组的原生方法了。在这篇 [「干货」细说 call、apply 以及 bind 的区别和用法](https://juejin.im/post/5c493086f265da6115111ce4) 中，有关于 call 更详细的用法介绍。
+
+`currArgs !== undefined` 的判断，是为了解决递归调用时的参数拼接。
+
+最后，判断 args 的个数，是否与 fn (也就是 sum )的参数个数相等，相等了就可以把参数都传给 fn，进行输出；否则，继续递归调用，直到两者相等。
+
+测试一下：
+
+```
+function sum(a, b, c) {
+    console.log(a + b + c);
+}
+
+const fn = curry(sum);
+
+fn(1, 2, 3); // 6
+fn(1, 2)(3); // 6
+fn(1)(2, 3); // 6
+fn(1)(2)(3); // 6
+复制代码
+```
+
+都能输出 6 了，搞定！
+
+###柯里化的用途
+
+理解了柯里化的实现之后，让我们来看一下它的实际应用。柯里化的目的是，减少代码冗余，以及增加代码的可读性。来看下面这个例子：
+
+```
+const persons = [
+    { name: 'kevin', age: 4 },
+    { name: 'bob', age: 5 }
+];
+
+// 这里的 curry 函数，之前已实现
+const getProp = curry(function (obj, index) {
+    const args = [].slice.call(arguments);
+    return obj[args[args.length - 1]];
+});
+
+const ages = persons.map(getProp('age')); // [4, 5]
+const names = persons.map(getProp('name')); // ['kevin', 'bob']
+复制代码
+```
+
+在实际的业务中，我们常会遇到类似的列表数据。用 getProp 就可以很方便地，取出列表中某个 key 对应的值。
+
+需要注意的是，`const names = persons.map(getProp('name'));` 执行这条语句时 getProp 的参数只有一个 `name`，而定义 getProp 方法时，传入 curry 的参数有2个，`obj` 和 `index`（这里必须写 2 个及以上的参数）。
+
+为什么要这么写？关键就在于 `arguments` 的隐式传参。
+
+```
+const getProp = curry(function (obj, index) {
+    console.log(arguments);
+    // 会输出4个类数组，取其中一个来看
+    // {
+    //     0: {name: "kevin", age: 4},
+    //     1: 0,
+    //     2: [
+    //         {name: "kevin", age: 4},
+    //         {name: "bob", age: 5}
+    //     ],
+    //     3: "age"
+    // }
+});
+复制代码
+```
+
+map 是 Array 的原生方法，它的用法如下：
+
+```
+var new_array = arr.map(function callback(currentValue[, index[, array]]) {
+    // Return element for new_array
+}[, thisArg]);
+复制代码
+```
+
+所以，我们传入的 `name`，就排在了 arguments 的最后。为了拿到 `name` 对应的值，需要对类数组 arguments 做点转换，让它可以使用 Array 的原生方法。所以，最终 getProp 方法定义成了这样：
+
+```
+const getProp = curry(function (obj, index) {
+    const args = [].slice.call(arguments);
+    return obj[args[args.length - 1]];
+});
+复制代码
+```
+
+当然，还有另外一种写法，curry 的实现更好理解，但是调用的代码却变多了，大家可以根据实际情况进行取舍。
+
+```
+const getProp = curry(function (key, obj) {
+    return obj[key];
+});
+
+const ages = persons.map(item => {
+    return getProp(item)('age');
+});
+const names = persons.map(item => {
+    return getProp(item)('name');
+});
+复制代码
+```
+
+最后，来看一个 Memoization 的例子。它用于优化比较耗时的计算，通过将计算结果缓存到内存中，这样对于同样的输入值，下次只需要中内存中读取结果。
+
+```
+function memoizeFunction(func) {
+    const cache = {};
+    return function() {
+        let key = arguments[0];
+        if (cache[key]) {
+            return cache[key];
+        } else {
+            const val = func.apply(null, arguments);
+            cache[key] = val;
+            return val;
+        }
+    };
+}
+
+const fibonacci = memoizeFunction(function(n) {
+    return (n === 0 || n === 1) ? n : fibonacci(n - 1) + fibonacci(n - 2);
+});
+
+console.log(fibonacci(100)); // 输出354224848179262000000
+console.log(fibonacci(100)); // 输出354224848179262000000
+复制代码
+```
+
+代码中，第2次计算 fibonacci(100) 则只需要在内存中直接读取结果。
+
+###总结
+
+**函数的柯里化，是 Javascript 中函数式编程的一个重要概念。它返回的，是一个函数的函数。其实现方式，需要依赖参数以及递归，通过拆分参数的方式，来调用一个多参数的函数方法，以达到减少代码冗余，增加可读性的目的。**
+
+## 八、Array的方法介绍
+
+###ES5 中 Array 操作
+
+#### 1、forEach
+
+Array 方法中最基本的一个，就是遍历，循环。基本用法：`[].forEach(function(item, index, array) {});`
+
+```javascript
+const array = [1, 2, 3];
+const result = [];
+
+array.forEach(function(item) {
+    result.push(item);
+});
+console.log(result); // [1, 2, 3]
+```
+
+#### 2、map
+
+map 方法的作用不难理解，“映射”嘛，也就是原数组被 “映射” 成对应的新数组。基本用法跟 forEach 方法类似：`[].map(function(item, index, array) {});` 下面这个例子是数值项求平方：
+
+```javascript
+const data = [1, 2, 3, 4];
+const arrayOfSquares = data.map(function (item) {
+    return item * item;
+});
+alert(arrayOfSquares); // 1, 4, 9, 16
+```
+
+#### 3、filter
+
+filter 为 “过滤”、“筛选” 之意。指数组 filter 后，返回过滤后的新数组。用法跟 map 极为相似：`[].filter(function(item, index, array) {});`
+
+filter 的 callback 函数，需要返回布尔值 true 或 false。返回值只要 **弱等于** Boolean 就行，看下面这个例子：
+
+```javascript
+const data = [0, 1, 2, 3];
+const arrayFilter = data.filter(function(item) {
+    return item;
+});
+console.log(arrayFilter); // [1, 2, 3]
+```
+
+#### 4、some 和 every
+
+some 意指“某些”，指是否 “某些项” 合乎条件。也就是 **只要有1值个让 callback 返回 true**  就行了。基本用法：`[].som(function(item, index, array) {});`
+
+```javascript
+const scores = [5, 8, 3, 10];
+const current = 7;
+
+function higherThanCurrent(score) {
+    return score > current;
+}
+
+if (scores.some(higherThanCurrent)) {
+    alert("one more");
+}
+```
+
+every 跟 some 是一对好基友，同样是返回 Boolean 值。但必须满足每 1 个值都要让 callback 返回 true 才行。改动一下上面 some 的例子：
+
+```javascript
+if (scores.every(higherThanCurrent)) {
+    console.log("every is ok!");
+} else {
+    console.log("oh no!");        
+}
+```
+
+#### 5、concat
+
+concat() 方法用于连接两个或多个数组。该方法不会改变现有的数组，仅会返回被连接数组的一个副本。
+
+```javascript
+const arr1 = [1,2,3];
+const arr2 = [4,5];
+const arr3 = arr1.concat(arr2);
+console.log(arr1); // [1, 2, 3]
+console.log(arr3); // [1, 2, 3, 4, 5]
+```
+
+#### 6、indexOf 和 lastIndexOf
+
+indexOf 方法在字符串中自古就有，string.indexOf(searchString, position)。数组这里的 indexOf 方法与之类似。 返回整数索引值，如果没有匹配（严格匹配），返回-1.
+
+fromIndex可选，表示从这个位置开始搜索，若缺省或格式不合要求，使用默认值0。
+
+```javascript
+const data = [2, 5, 7, 3, 5];
+console.log(data.indexOf(5, "x"));  // 1 ("x"被忽略)
+console.log(data.indexOf(5, "3")); // 4 (从3号位开始搜索)
+
+console.log(data.indexOf(4));    // -1 (未找到)
+console.log(data.indexOf("5")); // -1 (未找到，因为5 !== "5")
+```
+
+lastIndexOf 则是从后往前找。
+
+```javascript
+const numbers = [2, 5, 9, 2];
+numbers.lastIndexOf(2);     // 3
+numbers.lastIndexOf(7);     // -1
+numbers.lastIndexOf(2, 3);  // 3
+numbers.lastIndexOf(2, 2);  // 0
+numbers.lastIndexOf(2, -2); // 0
+numbers.lastIndexOf(2, -1); // 3
+```
+
+#### 7、reduce 和 reduceRight
+
+reduce 是JavaScript 1.8 中才引入的，中文意思为“归约”。基本用法：`reduce(callback[, initialValue])`
+
+callback 函数接受4个参数：之前值(previousValue)、当前值(currentValue)、索引值(currentIndex)以及数组本身(array)。
+
+可选的初始值(initialValue)，作为第一次调用回调函数时传给previousValue的值。也就是，为累加等操作传入起始值（额外的加值）。
+
+```javascript
+var sum = [1, 2, 3, 4].reduce(function (previous, current, index, array) {
+    return previous + current;
+});
+console.log(sum); // 10
+```
+
+解析：
+
+- 因为initialValue不存在，因此一开始的previous值等于数组的第一个元素
+- 从而 current 值在第一次调用的时候就是2
+- 最后两个参数为索引值 index 以及数组本身 array
+
+以下为循环执行过程：
+
+```javascript
+// 初始设置
+previous = initialValue = 1, current = 2
+
+// 第一次迭代
+previous = (1 + 2) =  3, current = 3
+
+// 第二次迭代
+previous = (3 + 3) =  6, current = 4
+
+// 第三次迭代
+previous = (6 + 4) =  10, current = undefined (退出)
+```
+
+有了reduce，我们可以轻松实现二维数组的扁平化：
+
+```javascript
+var matrix = [
+  [1, 2],
+  [3, 4],
+  [5, 6]
+];
+
+// 二维数组扁平化
+var flatten = matrix.reduce(function (previous, current) {
+    return previous.concat(current);
+});
+console.log(flatten); // [1, 2, 3, 4, 5, 6]
+```
+
+reduceRight 跟 reduce 相比，用法类似。实现上差异在于reduceRight是从数组的末尾开始实现。
+
+```javascript
+const data = [1, 2, 3, 4];
+const specialDiff = data.reduceRight(function (previous, current, index) {
+    if (index == 0) {
+        return previous + current;
+    }
+    return previous - current;
+});
+console.log(specialDiff);  // 0
+```
+
+#### 8、push 和 pop
+
+push() 方法可向数组的末尾添加一个或多个元素，返回的是新的数组长度，会改变原数组。
+
+```javascript
+const a = [2,3,4];
+const b = a.push(5);
+console.log(a);  // [2,3,4,5]
+console.log(b);  // 4
+// push方法可以一次添加多个元素push(data1, data2....)
+```
+
+pop() 方法用于删除并返回数组的最后一个元素。返回的是最后一个元素，会改变原数组。
+
+```javascript
+const arr = [2,3,4];
+console.log(arr.pop()); // 4
+console.log(arr);  // [2,3]
+```
+
+#### 9、shift 和 unshift
+
+shift() 方法用于把数组的第一个元素从其中删除，并返回第一个元素的值。返回第一个元素，改变原数组。
+
+```javascript
+const arr = [2,3,4];
+console.log(arr.shift()); // 2
+console.log(arr);  // [3,4]
+```
+
+unshift() 方法可向数组的开头添加一个或更多元素，并返回新的长度。返回新长度，改变原数组。
+
+```javascript
+const arr = [2,3,4,5];
+console.log(arr.unshift(3,6)); // 6
+console.log(arr); // [3, 6, 2, 3, 4, 5]
+// tip:该方法可以不传参数,不传参数就是不增加元素。
+```
+
+#### 10、slice 和 splice
+
+slice() 返回一个新的数组，包含从 start 到 end （不包括该元素）的 arrayObject 中的元素。返回选定的元素，该方法不会修改原数组。
+
+```javascript
+const arr = [2,3,4,5];
+console.log(arr.slice(1,3));  // [3,4]
+console.log(arr);  // [2,3,4,5]
+```
+
+splice() 可删除从 index 处开始的零个或多个元素，并且用参数列表中声明的一个或多个值来替换那些被删除的元素。如果从 arrayObject 中删除了元素，则返回的是含有被删除的元素的数组。splice() 方法会直接对数组进行修改。
+
+```javascript
+const a = [5,6,7,8];
+console.log(a.splice(1,0,9)); //[]
+console.log(a);  // [5, 9, 6, 7, 8]
+
+const b = [5,6,7,8];
+console.log(b.splice(1,2,3));  //v[6, 7]
+console.log(b); // [5, 3, 8]
+```
+
+#### 11、sort 和 reverse
+
+sort() 按照 Unicode code 位置排序，默认升序。
+
+```javascript
+const fruit = ['cherries', 'apples', 'bananas'];
+fruit.sort(); // ['apples', 'bananas', 'cherries']
+
+const scores = [1, 10, 21, 2];
+scores.sort(); // [1, 10, 2, 21]
+```
+
+reverse() 方法用于颠倒数组中元素的顺序。返回的是颠倒后的数组，会改变原数组。
+
+```javascript
+const arr = [2,3,4];
+console.log(arr.reverse()); // [4, 3, 2]
+console.log(arr);  // [4, 3, 2]
+```
+
+#### 12、join
+
+join() 方法用于把数组中的所有元素放入一个字符串。元素是通过指定的分隔符进行分隔的，默认使用','号分割，不改变原数组。
+
+```javascript
+const arr = [2,3,4];
+console.log(arr.join());  // 2,3,4
+console.log(arr);  // [2, 3, 4]
+```
+
+#### 13、isArray
+
+Array.isArray() 用于确定传递的值是否是一个 Array。一个比较冷门的知识点：其实 Array.prototype 也是一个数组。
+
+```javascript
+Array.isArray([]); // true
+Array.isArray(Array.prototype); // true
+
+Array.isArray(null); // false
+Array.isArray(undefined); // false
+Array.isArray(18); // false
+Array.isArray('Array'); // false
+Array.isArray(true); // false
+Array.isArray({ __proto__: Array.prototype });
+```
+
+在公用库中，一般会这么做 isArray 的判断：
+
+```
+Object.prototype.toString.call(arg) === '[object Array]';
+复制代码
+```
+
+###ES6 新增的 Array 操作
+
+#### 1、find 和 findIndex
+
+find() 传入一个回调函数，找到数组中符合当前搜索规则的第一个元素，返回这个元素，并且终止搜索。
+
+```javascript
+const arr = [1, "2", 3, 3, "2"]
+console.log(arr.find(n => typeof n === "number")) // 1
+```
+
+findIndex() 与 find() 类似，只是返回的是，找到的这个元素的下标。
+
+```javascript
+const arr = [1, "2", 3, 3, "2"]
+console.log(arr.findIndex(n => typeof n === "number")) // 0
+```
+
+#### 2、fill
+
+用指定的元素填充数组，其实就是用默认内容初始化数组。基本用法：`[].fill(value, start, end)`
+
+该函数有三个参数：填充值(value)，填充起始位置(start，可以省略)，填充结束位置(end，可以省略，实际结束位置是end-1)。
+
+```javascript
+// 采用一个默认值，填充数组
+const arr1 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+arr1.fill(7);
+console.log(arr1); // [7,7,7,7,7,7,7,7,7,7,7]
+
+// 制定开始和结束位置填充，实际填充结束位置是前一位。
+const arr2 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+arr2.fill(7, 2, 5);
+console.log(arr2); // [1,2,7,7,7,6,7,8,9,10,11]
+
+// 结束位置省略，从起始位置到最后。
+const arr3 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+arr3.fill(7, 2);
+console.log(arr3); // [1,2,7,7,7,7,7,7,7,7,7]
+```
+
+#### 3、from
+
+将类似数组的对象（array-like object）和可遍历（iterable）的对象转为真正的数组。
+
+```javascript
+const set = new Set(1, 2, 3, 3, 4);
+Array.from(set)  // [1,2,3,4]
+
+Array.from('foo'); // ["f", "o", "o"]
+```
+
+#### 4、of
+
+Array.of() 方法创建一个具有可变数量参数的新数组实例，而不考虑参数的数量或类型。
+
+Array.of() 和 Array 构造函数之间的区别在于处理整数参数：Array.of(7) 创建一个具有单个元素 7 的数组，而 Array(7) 创建一个长度为7的空数组（注意：这是指一个有7个空位的数组，而不是由7个undefined组成的数组）。
+
+```javascript
+Array.of(7);       // [7] 
+Array.of(1, 2, 3); // [1, 2, 3]
+
+Array(7);          // [ , , , , , , ]
+Array(1, 2, 3);    // [1, 2, 3]
+```
+
+#### 5、copyWithin
+
+选择数组的某个下标，从该位置开始复制数组元素，默认从0开始复制。也可以指定要复制的元素范围。基本用法：`[].copyWithin(target, start, end)`
+
+```javascript
+const arr = [1, 2, 3, 4, 5];
+console.log(arr.copyWithin(3));
+ // [1,2,3,1,2] 从下标为3的元素开始，复制数组，所以4, 5被替换成1, 2
+
+const arr1 = [1, 2, 3, 4, 5];
+console.log(arr1.copyWithin(3, 1)); 
+// [1,2,3,2,3] 从下标为3的元素开始，复制数组，指定复制的第一个元素下标为1，所以4, 5被替换成2, 3
+
+const arr2 = [1, 2, 3, 4, 5];
+console.log(arr2.copyWithin(3, 1, 2));
+// [1,2,3,2,5] 从下标为3的元素开始，复制数组，指定复制的第一个元素下标为1，结束位置为2，所以4被替换成2
+```
+
+#### 6、includes
+
+判断数组中是否存在该元素，参数：查找的值、起始位置，可以替换 ES5 时代的 indexOf 判断方式。
+
+```javascript
+const arr = [1, 2, 3];
+arr.includes(2); // true
+arr.includes(4); // false
+```
+
+另外，它还可以用于优化 || 的判断写法。
+
+```javascript
+if (method === 'post' || method === 'put' || method === 'delete') {
+    ...
+}
+
+// 用 includes 优化 `||` 的写法
+if (['post', 'put', 'delete'].includes(method)) {
+    ...
+}
+```
+
+#### 7、entries、values 和 keys
+
+entries() 返回迭代器：返回键值对
+
+```javascript
+//数组
+const arr = ['a', 'b', 'c'];
+for(let v of arr.entries()) {
+    console.log(v)
+}
+// [0, 'a'] [1, 'b'] [2, 'c']
+
+//Set
+const arr = new Set(['a', 'b', 'c']);
+for(let v of arr.entries()) {
+    console.log(v)
+}
+// ['a', 'a'] ['b', 'b'] ['c', 'c']
+
+//Map
+const arr = new Map();
+arr.set('a', 'a');
+arr.set('b', 'b');
+for(let v of arr.entries()) {
+    console.log(v)
+}
+// ['a', 'a'] ['b', 'b']
+```
+
+values() 返回迭代器：返回键值对的 value
+
+```javascript
+//数组
+const arr = ['a', 'b', 'c'];
+for(let v of arr.values()) {
+    console.log(v)
+}
+//'a' 'b' 'c'
+
+//Set
+const arr = new Set(['a', 'b', 'c']);
+for(let v of arr.values()) {
+    console.log(v)
+}
+// 'a' 'b' 'c'
+
+//Map
+const arr = new Map();
+arr.set('a', 'a');
+arr.set('b', 'b');
+for(let v of arr.values()) {
+    console.log(v)
+}
+// 'a' 'b'
+```
+
+keys() 返回迭代器：返回键值对的 key
+
+```javascript
+//数组
+const arr = ['a', 'b', 'c'];
+for(let v of arr.keys()) {
+    console.log(v)
+}
+// 0 1 2
+
+//Set
+const arr = new Set(['a', 'b', 'c']);
+for(let v of arr.keys()) {
+    console.log(v)
+}
+// 'a' 'b' 'c'
+
+//Map
+const arr = new Map();
+arr.set('a', 'a');
+arr.set('b', 'b');
+for(let v of arr.keys()) {
+    console.log(v)
+}
+// 'a' 'b'
+```
+
+
 
 类型转换
 
 https://blog.csdn.net/one_and_only4711/article/details/6281581
-
-js常见算法
-
-https://www.cnblogs.com/lvmylife/p/7208541.html
-
-js数组去重
-
-https://www.cnblogs.com/guangyan/articles/6682686.html
 
 js基本数据类型和引用数据类型
 
