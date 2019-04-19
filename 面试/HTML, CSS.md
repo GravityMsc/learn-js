@@ -1431,3 +1431,427 @@ input {
 ::first-line 匹配某个块级元素的第一行
 
 ::selection 匹配用户划词时的高亮部分
+
+## 12、HTML行内元素、块状元素、行内块状元素的区别
+
+HTML可以将元素分类方式分为行内元素、块状元素和行内块状元素三种。首先需要说明的是，这三者可以互相转换的，使用display属性能够将三者任意转换：
+
+（1）display: inline; 转换为行内元素
+
+（2）display: block; 转换为块状元素
+
+（3）display: inline-block; 转换为行内块状元素
+
+```html
+<!DOCTYPE html>
+<html>
+
+    <head>
+        <meta charset="utf-8" />
+        <title>测试案例</title>
+        <style type="text/css">
+            span {
+                 display: block;
+                width: 120px;
+                height: 30px;
+                background: red;
+            }
+            
+            div {
+                display: inline;
+                width: 120px;
+                height: 200px;
+                background: green;
+            }
+            
+            i {
+                display: inline-block;
+                width: 120px;
+                height: 30px;
+                background: lightblue;
+            }
+        </style>
+    </head>
+
+    <body>
+        <span>行内转块状</span>
+        <div>块状转行内 </div>
+        <i>行内转行内块状</i>
+    </body>
+
+</html>
+```
+
+### 1、行内元素
+
+行内元素最常使用的就是span，其他的只在特定功能下使用，修饰字体\<b>和\<i>标签，还有\<sub>和\<sup>这两个标签可以直接做出平方的效果，而不需要类似移动属性的帮助，很实用。
+
+行内元素特征：（1）设置宽高无效
+
+​			     （2）对margin仅设置左右方向有效，上下无效；padding设置上下左右都有效，即会撑大空间
+
+​			     （3）不会自动进行换行
+
+```html
+<!DOCTYPE html>
+<html>
+
+    <head>
+        <meta charset="utf-8" />
+        <title>测试案例</title>
+        <style type="text/css">
+            span {
+                width: 120px;
+                height: 120px;
+                margin: 1000px 20px;
+                padding: 50px 40px;
+                background: lightblue;
+            }
+        </style>
+    </head>
+
+    <body>
+        <i>不会自动换行</i>
+        <span>行内元素</span>
+    </body>
+
+</html>
+```
+
+### 2、块状元素
+
+块状元素代表性的就是div，其他如p、nav、aside、header、footer、section、article、ul-li、address等等，都可以用div来实现。不过为了可以方便程序员解读代码，一般都会使用特定的语义化标签，使得代码可读性强，且便于查错。
+
+块状元素特征：（1）能够识别宽高
+
+​			     （2）margin和padding的上下左右均对其有效
+
+​			     （3）可以自动换行
+
+​			     （4）多个块状元素标签写在一起，默认排列方式为从上至下
+
+```html
+<!DOCTYPE html>
+<html>
+
+    <head>
+        <meta charset="utf-8" />
+        <title>测试案例</title>
+        <style type="text/css">
+            div {
+                width: 120px;
+                height: 120px;
+                margin: 50px 50px;
+                padding: 50px 40px;
+                background: lightblue;
+            }
+        </style>
+    </head>
+
+    <body>
+        <i>自动换行</i>
+        <div>块状元素</div>
+        <div>块状元素</div>
+    </body>
+
+</html>
+```
+
+### 3、行内块状元素
+
+行内块状元素综合了行内元素和块状元素的特性，但是各有取舍。因此行内块状元素在日常的使用中，由于其特性，使用的次数也比较多。
+
+行内块状元素特征：（1）不自动换行
+
+　　　　　　　　　（2）能够识别宽高
+
+　　　　　　　　　（3）默认排列方式为从左到右
+
+```html
+<!DOCTYPE html>
+<html>
+
+    <head>
+        <meta charset="utf-8" />
+        <title>测试案例</title>
+        <style type="text/css">
+            div {
+                display: inline-block;
+                width: 100px;
+                height: 50px;
+                background: lightblue;
+            }
+        </style>
+    </head>
+
+    <body>
+        <div>行内块状元素</div>
+        <div>行内块状元素</div>
+        
+    </body>
+
+</html>
+```
+
+## 13、BFC
+
+在一个Web页面的CSS渲染中，[块级格式化上下文](http://www.w3.org/TR/CSS21/visuren.html#block-formatting) (Block Fromatting Context)是按照块级盒子布局的。W3C对BFC的定义如下：
+
+>浮动元素和绝对定位元素，非块级盒子的块级容器（例如 inline-blocks, table-cells, 和 table-captions），以及overflow值不为“visiable”的块级盒子，都会为他们的内容创建新的BFC（块级格式上下文）。
+
+为了便于理解，我们换一种方式来重新定义BFC。一个HTML元素要创建BFC，则满足下列的任意一个或多个条件即可：
+
+1、float的值不是none。
+2、position的值不是static或者relative。
+3、display的值是inline-block、table-cell、flex、table-caption或者inline-flex
+4、overflow的值不是visible
+
+BFC是一个独立的布局环境，其中的元素布局是不受外界的影响，并且在一个BFC中，块盒与行盒（行盒由一行中所有的内联元素所组成）都会垂直的沿着其父元素的边框排列。
+
+### 怎么创建BFC
+
+要显示的创建一个BFC是非常简单的，只要满足上述4个CSS条件之一就行。例如：
+
+```html
+<div class="container">
+  你的内容
+</div>
+```
+
+在类container中添加类似 overflow: scroll，overflow: hidden，display: flex，float: left，或 display: table 的规则来显示创建BFC。虽然添加上述的任意一条都能创建BFC，但会有一些副作用：
+
+1、display: table 可能引发响应性问题
+2、overflow: scroll 可能产生多余的滚动条
+3、float: left 将把元素移至左侧，并被其他元素环绕
+4、overflow: hidden 将裁切溢出元素
+
+因而无论什么时候需要创建BFC，都要基于自身的需要来考虑。对于本文，将采用 overflow: hidden 方式：
+
+```css
+.container {
+    overflow: hidden;
+}
+```
+
+### 再说两点
+
+#### BFC中盒子怎么对齐
+
+如前文所说，在一个BFC中，块盒与行盒（行盒由一行中所有的内联元素所组成）都会垂直的沿着其父元素的边框排列。W3C给出得规范是：
+
+>在BFC中，每一个盒子的左外边缘（margin-left）会触碰到容器的左边缘(border-left)（对于从右到左的格式来说，则触碰到右边缘）。浮动也是如此（尽管盒子里的行盒子 Line Box 可能由于浮动而变窄），除非盒子创建了一个新的BFC（在这种情况下盒子本身可能由于浮动而变窄）。
+
+![BFC](https://camo.githubusercontent.com/79bf7dc35ecbddea11eab4edc9eacf6bd88af365/687474703a2f2f7365676d656e746661756c742e636f6d2f696d672f62566d327150)
+
+#### 外边距折叠
+
+常规流布局时，盒子都是垂直排列，两者之间的间距由各自的外边距所决定，但不是二者外边距之和。
+
+```html
+<div class="container">
+  <p>Sibling 1</p>
+  <p>Sibling 2</p>
+</div>
+```
+
+对应的CSS：
+
+```css
+.container {
+  background-color: red;
+  overflow: hidden; /* creates a block formatting context */
+}
+p {
+  background-color: lightgreen;
+  margin: 10px 0;
+}
+```
+
+渲染结果如图：
+[![img2](https://camo.githubusercontent.com/9332f52c1e1500ca828443ae15d2282b4c121483/687474703a2f2f7365676d656e746661756c742e636f6d2f696d672f62566d327152)](https://camo.githubusercontent.com/9332f52c1e1500ca828443ae15d2282b4c121483/687474703a2f2f7365676d656e746661756c742e636f6d2f696d672f62566d327152)
+
+在上图中，一个红盒子（div）包含着两个兄弟元素（p），一个BFC已经创建了出来。
+
+理论上，两个p元素之间的外边距应当是二者外边距之和（20px）但实际上却是10px，这是外边距折叠(Collapsing Margins)的结果。
+
+在CSS当中，相邻的两个盒子（可能是兄弟关系也可能是祖先关系）的外边距可以结合成一个单独的外边距。这种合并外边距的方式被称为折叠，并且因而所结合成的外边距称为折叠外边距。折叠的结果按照如下规则计算：
+
+1、两个相邻的外边距都是正数时，折叠结果是它们两者之间较大的值。
+2、两个相邻的外边距都是负数时，折叠结果是两者绝对值的较大值。
+3、两个外边距一正一负时，折叠结果是两者的相加的和。
+
+产生折叠的必备条件：margin必须是邻接的! (对于不产生折叠的情况，见参考文章的链接)
+
+### BFC可以做什么呢？
+
+#### 利用BFC避免外边距折叠
+
+BFC可能造成外边距折叠，也可以利用它来避免这种情况。BFC产生外边距折叠要满足一个条件：两个相邻元素要处于同一个BFC中。所以，若两个相邻元素在不同的BFC中，就能避免外边距折叠。
+
+改进前面的例子：
+
+```html
+<div class="container">
+    <p>Sibling 1</p>
+    <p>Sibling 2</p>
+    <p>Sibling 3</p>
+</div>
+```
+
+对应的CSS：
+
+```css
+.container {
+  background-color: red;
+  overflow: hidden; /* creates a block formatting context */
+}
+p {
+  background-color: lightgreen;
+  margin: 10px 0;
+}
+```
+
+结果和上面一样，由于外边距折叠，三个相邻P元素之间的垂直距离是10px，这是因为三个 p 标签都从属于同一个BFC。
+
+修改第三个P元素，使之创建一个新的BFC：
+
+```html
+<div class="container">
+    <p>Sibling 1</p>
+    <p>Sibling 2</p>
+    <div class="newBFC">
+        <p>Sibling 3</p>
+    </div>
+</div>
+```
+
+对应的CSS：
+
+```css
+.container {
+    background-color: red;
+    overflow: hidden; /* creates a block formatting context */
+}
+p {
+    margin: 10px 0;
+    background-color: lightgreen;
+}
+.newBFC {
+    overflow: hidden;  /* creates new block formatting context */
+}
+```
+
+现在的结果如图：
+[![img](https://camo.githubusercontent.com/c7c77701b984c7d4f957a7729db2cf534ef92c3d/687474703a2f2f7365676d656e746661756c742e636f6d2f696d672f62566d327153)](https://camo.githubusercontent.com/c7c77701b984c7d4f957a7729db2cf534ef92c3d/687474703a2f2f7365676d656e746661756c742e636f6d2f696d672f62566d327153)
+
+因为第二个和第三个P元素现在分属于不同的BFC，它们之间就不会发生外边距折叠了。
+
+#### BFC包含浮动
+
+浮动元素是会脱离文档流的(绝对定位元素会脱离文档流)。如果一个没有高度或者height是auto的容器的子元素是浮动元素，则该容器的高度是不会被撑开的。我们通常会利用伪元素(:after或者:before)来解决这个问题。BFC能包含浮动，也能解决容器高度不会被撑开的问题。
+
+[![img](https://camo.githubusercontent.com/21d74bf8701804cd465f8f88311d771372f0df4b/687474703a2f2f7365676d656e746661756c742e636f6d2f696d672f62566d327154)](https://camo.githubusercontent.com/21d74bf8701804cd465f8f88311d771372f0df4b/687474703a2f2f7365676d656e746661756c742e636f6d2f696d672f62566d327154)
+
+看个例子：
+
+```html
+<div class="container">
+    <div>Sibling</div>
+    <div>Sibling</div>
+</div>
+
+```
+
+对应的CSS：
+
+```css
+.container {
+  background-color: green;
+}
+.container div {
+  float: left;
+  background-color: lightgreen;
+  margin: 10px;
+}
+```
+
+在上面这个例子中，容器没有任何高度，并且它包不住浮动子元素，容器的高度并不会被撑开。为解决这个问题，可以在容器中创建一个BFC：
+
+```css
+.container {
+    overflow: hidden; /* creates block formatting context */
+    background-color: green;
+}
+.container div {
+    float: left;
+    background-color: lightgreen;
+    margin: 10px;
+}
+```
+
+现在容器可以包住浮动子元素，并且其高度会扩展至包住其子元素，在这个新的BFC中浮动元素又回归到页面的常规流之中了。
+
+#### 使用BFC避免文字环绕
+
+[![img](https://camo.githubusercontent.com/f09eac6e73acf8ecfcc329b1bff19c778912219e/687474703a2f2f7365676d656e746661756c742e636f6d2f696d672f62566d327159)](https://camo.githubusercontent.com/f09eac6e73acf8ecfcc329b1bff19c778912219e/687474703a2f2f7365676d656e746661756c742e636f6d2f696d672f62566d327159)
+
+如上图所示，对于浮动元素，可能会造成文字环绕的情况(Figure1)，但这并不是我们想要的布局(Figure2才是想要的)。要解决这个问题，我们可以用外边距，但也可以用BFC。
+
+First let us understand why the text wraps. For this we have to understand how the box model works when an element is floated. This is the part I left earlier while discussing the alignment in a block formatting context. Let us understand what is happening in Figure 1 in the diagram below:
+
+[![img](https://camo.githubusercontent.com/d5233a0edc9dd480538f6e75cf65d058c6fd88c7/687474703a2f2f7365676d656e746661756c742e636f6d2f696d672f62566d327130)](https://camo.githubusercontent.com/d5233a0edc9dd480538f6e75cf65d058c6fd88c7/687474703a2f2f7365676d656e746661756c742e636f6d2f696d672f62566d327130)
+
+假设HTML是：
+
+```html
+<div class="container">
+    <div class="floated">
+        Floated div
+    </div>
+    <p>
+        Quae hic ut ab perferendis sit quod architecto, 
+        dolor debitis quam rem provident aspernatur tempora
+        expedita.
+    </p>
+</div>
+```
+
+上图整个黑色区域表示 p 元素。p 元素没有移位但它叠在了浮动元素之下，而p元素的文本(行盒子)却移位了，行盒子水平变窄来给浮动元素腾出了空间。随着文本的增加，最后文本将环绕在浮动元素之下，因为那时候行盒子不再需要移位，也就成了图Figure1的样子。
+
+再回顾一下W3C的描述：
+>在BFC上下文中，每个盒子的左外侧紧贴包含块的左侧（从右到左的格式里，则为盒子右外侧紧贴包含块右侧），甚至有浮动也是如此（尽管盒子里的行盒子 Line Box 可能由于浮动而变窄），除非盒子创建了一个新的BFC（在这种情况下盒子本身可能由于浮动而变窄）。
+
+因而，如果p元素创建一个新的BFC那它就不会再紧贴包含块的左侧了。
+
+#### 在多列布局中使用BFC
+
+如果我们创建一个占满整个容器宽度的多列布局，在某些浏览器中最后一列有时候会掉到下一行。这可能是因为浏览器四舍五入了列宽从而所有列的总宽度会超出容器。但如果我们在多列布局中的最后一列里创建一个新的BFC，它将总是占据其他列先占位完毕后剩下的空间。
+
+例如：
+
+```html
+<div class="container">
+    <div class="column">column 1</div>
+    <div class="column">column 2</div>
+    <div class="column">column 3</div>
+</div>
+```
+
+对应的CSS：
+
+```css
+.column {
+    width: 31.33%;
+    background-color: green;
+    float: left;
+    margin: 0 1%;
+}
+/*  Establishing a new block formatting 
+    context in the last column */
+.column:last-child {
+    float: none;
+overflow: hidden; 
+}
+```
+
+现在尽管盒子的宽度稍有改变，但布局不会打破。当然，对多列布局来说这不一定是个好办法，但能避免最后一列下掉。这个问题上弹性盒或许是个更好的解决方案，但这个办法可以用来说明元素在这些环境下的行为。
