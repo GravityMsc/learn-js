@@ -500,7 +500,7 @@ MVVM模式和MVC模式一样，主要目的是分离视图（View）和模型（
 
 this既然是函数调用是才绑定的，那么需要首先需要确定函数的调用位置。这个一般是比较容易的，先确认调用栈，然后当前调用栈的前一个就是调用位置了。示例如下：
 
-```
+```javascript
 function a() {
   // 调用栈是c->b->a, 调用位置b
   console.log(a);
@@ -516,7 +516,6 @@ function c() {
   b();
 }
 c(); // c的调用位置
-复制代码
 ```
 
 ###应用绑定规则
@@ -527,13 +526,12 @@ c(); // c的调用位置
 
 一般可以理解为无法应用其他规则时的兜底默认规则，独立函数调用时一般适用。
 
-```
+```javascript
 function test(){
 	console.log(this.a);
 }
 var a = 'aaa'; // 或者window.a='aaa'
 test(); // 输出2
-复制代码
 ```
 
 上面这种方式便是默认绑定，test()不在任何对象内的独立调用，适用于默认绑定，**默认绑定this指向的全局对象，在浏览器里面就是window，在node里面就是global， ps：严格模式下，全局对象无法使用默认绑定，默认绑定会绑定到undefined上**
@@ -542,7 +540,7 @@ test(); // 输出2
 
 隐式绑定存在于在调用位置有上下文对象或者说调用时被对象包含或拥有，示例如下：
 
-```
+```javascript
 const obj = {
 	name: 'oooo',
 	say: function(){
@@ -550,7 +548,6 @@ const obj = {
 	}
 }
 obj.say();// oooo
-复制代码
 ```
 
 看上面函数say的调用，不是say单独调用，而是被对象obj包含着调用，此时this是指向obj对象的。
@@ -559,7 +556,7 @@ obj.say();// oooo
 
 有一种情况是看似应该是隐式绑定，但实际却是默认绑定，有两个栗子如下：
 
-```
+```javascript
 栗子one：
 var name = 'globallll';
 var obj = {
@@ -583,17 +580,15 @@ function b(func){
 	func();
 }
 b(obj.say);// globallll
-复制代码
 ```
 
 看起来say函数的确是obj对象的一部分呀，但为什么看起来this是指向的window呢？《you don't know JavaScript》里面把这种特殊对待称为是隐式丢失，但我理解是这种情况是不满足隐式函数绑定的，因为隐式函数绑定应当是调用是被对象包含着调用，而不是说只要是对象的其中一部分就可以了，重点在于调用时是否被函数包含着！
 
 我们来看下上述的两个例子，第一个是把obj里的函数say的引用赋值给copy变量，再通过copy来调用，copy调用时并没有被obj包含着调用，这就适用默认绑定规则--独立函数调用，因此此时this是指向window的。第二个例子同理，只不过看起来是调用的obj.say(),但实际过程是：
 
-```
+```javascript
 	func = obj.say;
 	func();
-复制代码
 ```
 
 和第一个一样都有一个赋值的过程。
@@ -602,7 +597,7 @@ b(obj.say);// globallll
 
 首先为啥需要显示绑定呢？因为以上两个规则会导致this的指向不稳定，但有时我们需要函数中this稳定指向某个对象的。比如下面这个：
 
-```
+```javascript
 var obj = {
 	name: 'ooooo',
 	say: function(){
@@ -611,14 +606,13 @@ var obj = {
 }
 var name = 'globalllll';
 setTimeout(obj.say, 1000); // globalllll
-复制代码
 ```
 
 这个例子中我们其实是想让this指向obj然后输出‘ooooo’的，但实际上调用的过程中首先进行了赋值然后进行了调用，导致使用默认绑定，this指向了window。为了能固定this的绑定，才有了显示绑定。
 
 显示绑定有三种方式：apply，call和bind。这三个函数大家应该用的比较多了，其中apply和call只有传参的区别，而apply和bind的区别在于apply绑定后立即执行，而bind可以返回绑定后的函数。上述例子可以这么解决：
 
-```
+```javascript
 var obj = {
 	name: 'ooooo',
 	say: function(){
@@ -632,7 +626,6 @@ var test = obj.say.bind(obj);//绑定后this指向不可修改
 //}
 var name = 'globalllll';
 setTimeout(test, 1000); // oooo
-复制代码
 ```
 
 思考🤔：如何用apply或者call实现bind？
@@ -664,7 +657,7 @@ new是一个由类新建示例的过程。使用new时会调用构造函数，�
 
 es6中引入的箭头函数虽然也叫函数，但是却不适用于上面的四规则。先引入一个🌰：
 
-```
+```javascript
 function a(){
 	return ()=>{
 		console.log(this.name);
@@ -678,7 +671,6 @@ const obj2={
 }
 var test = a.call(obj1);
 test.call(obj2); // 11111
-复制代码
 ```
 
 上面例子中箭头函数理论上绑定的是obj2，但是实际输出的却是11111。所以箭头函数是不适用于上面的四规则的。箭头函数的具体规则时：箭头函数this是在声明时就确定了，其this就是声明时所在作用域的this确定的。比如上面的例子，箭头函数是在a函数中声明的，所以箭头函数中所用的this就是a的this，而a中的this是根据调用位置和规则确定是obj1，所以箭头函数中this也是指向obj1。
@@ -703,9 +695,8 @@ test.call(obj2); // 11111
 
 #### call 的写法
 
-```
+```javascript
 Function.call(obj,[param1[,param2[,…[,paramN]]]])
-复制代码
 ```
 
 需要注意以下几点：
@@ -714,7 +705,7 @@ Function.call(obj,[param1[,param2[,…[,paramN]]]])
 - call 的第一个参数，是一个对象。 Function 的调用者，将会指向这个对象。如果不传，则默认为全局对象 window。
 - 第二个参数开始，可以接收任意个参数。每个参数会映射到相应位置的 Function 的参数上。但是如果将所有的参数作为数组传入，它们会作为一个整体映射到 Function 对应的第一个参数上，之后参数都为空。
 
-```
+```javascript
 function func (a,b,c) {}
 
 func.call(obj, 1,2,3)
@@ -722,14 +713,12 @@ func.call(obj, 1,2,3)
 
 func.call(obj, [1,2,3])
 // func 接收到的参数实际上是 [1,2,3],undefined,undefined
-复制代码
 ```
 
 #### apply 的写法
 
-```
+```javascript
 Function.apply(obj[,argArray])
-复制代码
 ```
 
 需要注意的是：
@@ -737,7 +726,7 @@ Function.apply(obj[,argArray])
 - 它的调用者必须是函数 Function，并且只接收两个参数，第一个参数的规则与 call 一致。
 - 第二个参数，必须是数组或者类数组，它们会被转换成类数组，传入 Function 中，并且会被映射到 Function 对应的参数上。这也是 call 和 apply 之间，很重要的一个区别。
 
-```
+```javascript
 func.apply(obj, [1,2,3])
 // func 接收到的参数实际上是 1,2,3
 
@@ -748,7 +737,6 @@ func.apply(obj, {
     length: 3
 })
 // func 接收到的参数实际上是 1,2,3
-复制代码
 ```
 
 #### 什么是类数组？
@@ -757,14 +745,13 @@ func.apply(obj, {
 
 那么，类数组是什么呢？顾名思义，就是**具备与数组特征类似的对象**。比如，下面的这个对象，就是一个类数组。
 
-```
+```javascript
 let arrayLike = {
     0: 1,
     1: 2,
     2: 3,
     length: 3
 };
-复制代码
 ```
 
 类数组 arrayLike 可以通过角标进行调用，具有length属性，同时也可以通过 for 循环进行遍历。
@@ -781,7 +768,7 @@ let arrayLike = {
 
 **1、对象的继承**。如下面这个例子：
 
-```
+```javascript
 function superClass () {
     this.a = 1;
     this.print = function () {
@@ -796,16 +783,14 @@ function subClass () {
 
 subClass();
 // 1
-复制代码
 ```
 
 subClass 通过 call 方法，继承了 superClass 的 print 方法和 a 变量。此外，subClass 还可以扩展自己的其他方法。
 
 **2、借用方法**。还记得刚才的类数组么？如果它想使用 Array 原型链上的方法，可以这样：
 
-```
+```javascript
 let domNodes = Array.prototype.slice.call(document.getElementsByTagName("*"));
-复制代码
 ```
 
 这样，domNodes 就可以应用 Array 下的所有方法了。
@@ -814,9 +799,8 @@ let domNodes = Array.prototype.slice.call(document.getElementsByTagName("*"));
 
 **1、Math.max**。用它来获取数组中最大的一项。
 
-```
+```javascript
 let max = Math.max.apply(null, array);
-复制代码
 ```
 
 同理，要获取数组中最小的一项，可以这样：
@@ -828,13 +812,12 @@ let min = Math.min.apply(null, array);
 
 **2、实现两个数组合并**。在 ES6 的扩展运算符出现之前，我们可以用 Array.prototype.push来实现。
 
-```
+```javascript
 let arr1 = [1, 2, 3];
 let arr2 = [4, 5, 6];
 
 Array.prototype.push.apply(arr1, arr2);
 console.log(arr1); // [1, 2, 3, 4, 5, 6]
-复制代码
 ```
 
 ###bind 的使用
@@ -852,7 +835,7 @@ bind 方法 与 apply 和 call 比较类似，也能改变函数体内的 this �
 
 来看下面这个例子：
 
-```
+```javascript
 function add (a, b) {
     return a + b;
 }
@@ -863,7 +846,6 @@ function sub (a, b) {
 
 add.bind(sub, 5, 3); // 这时，并不会返回 8
 add.bind(sub, 5, 3)(); // 调用后，返回 8
-复制代码
 ```
 
 如果 bind 的第一个参数是 null 或者 undefined，this 就指向全局对象 window。
@@ -1255,8 +1237,6 @@ _.uniqWith(objects, _.isEqual);
 
 前面出现过去重的算法，这里需要是统计重复次数。
 
-[![复制代码](https://common.cnblogs.com/images/copycode.gif)](javascript:void(0);)
-
 ```javascript
 function findMaxDuplicateChar(str) {  
   if(str.length == 1) {
@@ -1291,8 +1271,6 @@ module.exports = findMaxDuplicateChar;
 
 如果说到算法题目的话，应该大多都是比较开放的题目，不限定算法的实现，但是一定要求掌握其中的几种，所以冒泡排序，这种较为基础并且便于理解记忆的算法一定需要熟记于心。冒泡排序算法就是依次比较大小，小的的大的进行位置上的交换。
 
-[![复制代码](https://common.cnblogs.com/images/copycode.gif)](javascript:void(0);)
-
 ```javascript
 function bubbleSort(arr) {  
     for(let i = 0,l=arr.length;i<l-1;i++) {
@@ -1312,8 +1290,6 @@ module.exports = bubbleSort;
 #### 2.选择排序
 
 算法参考某个元素值，将小于它的值，放到左数组中，大于它的值的元素就放到右数组中，然后递归进行上一次左右数组的操作，返回合并的数组就是已经排好顺序的数组了。
-
-[![复制代码](https://common.cnblogs.com/images/copycode.gif)](javascript:void(0);)
 
 ```javascript
 function quickSort(arr) {
@@ -1416,7 +1392,7 @@ console.log(insertSort(arr));//[2, 3, 4, 5, 15, 19, 26, 27, 36, 38, 44, 46, 47, 
 
 **JS代码实现:**
 
-```
+```javascript
 function quickSort (arr) {
 	if(arr.length <= 1) {
         return arr;  //递归出口
@@ -1466,7 +1442,6 @@ function quickSort2(arr, low, high) {
 }
 var arr=[3,44,38,5,47,15,36,26,27,2,46,4,19,50,48];
 console.log(quickSort2(arr,0,arr.length-1));//[2, 3, 4, 5, 15, 19, 26, 27, 36, 38, 44, 46, 47, 48, 50]
-复制代码
 ```
 
 ####5.希尔排序（Shell Sort）
@@ -1502,7 +1477,7 @@ console.log(quickSort2(arr,0,arr.length-1));//[2, 3, 4, 5, 15, 19, 26, 27, 36, 3
 
 **JS代码实现:**
 
-```
+```javascript
 function shellSort(arr) {
     var len = arr.length,
         temp,
@@ -1523,8 +1498,6 @@ function shellSort(arr) {
 }
 var arr=[3,44,38,5,47,15,36,26,27,2,46,4,19,50,48];
 console.log(shellSort(arr));//[2, 3, 4, 5, 15, 19, 26, 27, 36, 38, 44, 46, 47, 48, 50]
-
-复制代码
 ```
 
 ####6.归并排序（Merge Sort）
@@ -1534,10 +1507,6 @@ console.log(shellSort(arr));//[2, 3, 4, 5, 15, 19, 26, 27, 36, 38, 44, 46, 47, 4
 归并排序（Merge sort）是建立在归并操作上的一种有效的排序算法。该算法是**采用分治法**（Divide and Conquer）的一个非常典型的应用。
 
 归并排序是一种稳定的排序方法。将已有序的子序列合并，得到完全有序的序列；即先使每个子序列有序，再使子序列段间有序。若将两个有序表合并成一个有序表，称为2-路归并。
-
-
-
-![归并排序](data:image/svg+xml;utf8,<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="811" height="505"></svg>)
 
 #####算法步骤及实现代码
 
@@ -1551,7 +1520,7 @@ console.log(shellSort(arr));//[2, 3, 4, 5, 15, 19, 26, 27, 36, 38, 44, 46, 47, 4
 
 **JS代码实现:**
 
-```
+```javascript
 function mergeSort(arr) {  //采用自上而下的递归方法
     var len = arr.length;
     if(len < 2) {
@@ -1582,7 +1551,6 @@ function merge(left, right){
 }
 var arr=[3,44,38,5,47,15,36,26,27,2,46,4,19,50,48];
 console.log(mergeSort(arr));//[2, 3, 4, 5, 15, 19, 26, 27, 36, 38, 44, 46, 47, 48, 50]
-复制代码
 ```
 
 ####7.堆排序（Heap Sort）
@@ -1608,7 +1576,7 @@ console.log(mergeSort(arr));//[2, 3, 4, 5, 15, 19, 26, 27, 36, 38, 44, 46, 47, 4
 
 **JS代码实现:**
 
-```
+```javascript
 function buildMaxHeap(arr,len) {   // 建立大顶堆
     
     for (var i = Math.floor(len/2); i >= 0; i--) {
@@ -1654,7 +1622,6 @@ function heapSort(arr) {
 }
 var arr=[3,44,38,5,47,15,36,26,27,2,46,4,19,50,48];
 console.log(heapSort(arr));//[2, 3, 4, 5, 15, 19, 26, 27, 36, 38, 44, 46, 47, 48, 50]
-复制代码
 ```
 
 ####8.计数排序（Counting Sort）
@@ -1684,7 +1651,7 @@ console.log(heapSort(arr));//[2, 3, 4, 5, 15, 19, 26, 27, 36, 38, 44, 46, 47, 48
 
 **JS代码实现:**
 
-```
+```javascript
 //以下实现不仅支持了数值序列的排序，还支持根据对象的某个属性值来排序。
 function countSort(array, keyName){
   var length = array.length,
@@ -1722,7 +1689,6 @@ function countSort(array, keyName){
 }
 var arr=[3,44,38,5,47,15,36,26,27,2,46,4,19,50,48];
 console.log(countSort(arr));//[2, 3, 4, 5, 15, 19, 26, 27, 36, 38, 44, 46, 47, 48, 50]
-复制代码
 ```
 
 ####9.桶排序（Bucket Sort）
@@ -1755,7 +1721,7 @@ console.log(countSort(arr));//[2, 3, 4, 5, 15, 19, 26, 27, 36, 38, 44, 46, 47, 4
 
 **JS代码实现:**
 
-```
+```javascript
 function bucketSort(arr, bucketSize) {
     if (arr.length === 0) {
       return arr;
@@ -1798,7 +1764,6 @@ function bucketSort(arr, bucketSize) {
 }
 var arr=[3,44,38,5,47,15,36,26,27,2,46,4,19,50,48];
 console.log(bucketSort(arr));//[2, 3, 4, 5, 15, 19, 26, 27, 36, 38, 44, 46, 47, 48, 50]
-复制代码
 ```
 
 ####10.基数排序（Radix Sort）
@@ -1832,7 +1797,7 @@ console.log(bucketSort(arr));//[2, 3, 4, 5, 15, 19, 26, 27, 36, 38, 44, 46, 47, 
 
 **JS代码实现:**
 
-```
+```javascript
 /**
  * 基数排序适用于：
  *  (1)数据范围较小，建议在小于1000
@@ -1871,7 +1836,6 @@ function radixSort(arr, maxDigit) {
 }
 var arr = [3, 44, 38, 5, 47, 15, 36, 26, 27, 2, 46, 4, 19, 50, 48];
 console.log(radixSort(arr,2)); //[2, 3, 4, 5, 15, 19, 26, 27, 36, 38, 44, 46, 47, 48, 50]
-复制代码
 ```
 
 ####11.二叉树和二叉查找树
@@ -1911,26 +1875,23 @@ console.log(radixSort(arr,2)); //[2, 3, 4, 5, 15, 19, 26, 27, 36, 38, 44, 46, 47
 
 二叉树的最小元素是节点，所以先定义一个节点
 
-```
+```javascript
 function Node(data,left,right) {
     this.left = left;
     this.right = right;
     this.data = data;
     this.show = () => {return this.data}
 }
-复制代码
 ```
 
 这个就是二叉树的最小结构单元
 
 **二叉树**
 
-```
+```javascript
 function BST() {
     this.root = null //初始化,root为null
 }
-
-复制代码
 ```
 
 BST初始化时，只有一个根节点，且没有任何数据。 接下来，我们利用二叉查找树的规则，定义一个插入方法，这个方法的基本思想是:
@@ -1942,7 +1903,7 @@ BST初始化时，只有一个根节点，且没有任何数据。 接下来，�
 
 **最左变的叶子节点是最小的数，最右的叶子节点是最大的数**
 
-```
+```javascript
 function insert(data) {
     var node = new Node(data,null,null);
     if(this.root === null) {
@@ -1968,32 +1929,28 @@ function insert(data) {
         }
     }
 }
-复制代码
 ```
 
 这里，是使用了一个循环方法，不断的去向子树寻找正确的位置。 循环和递归都有一个核心，就是找到出口，这里的出口就是当current 为null的时候，代表没有内容，可以插入。
 
 接下来，将此方法写入BST即可:
 
-```
+```javascript
 function BST() {
     this.root = null;
     this.insert = insert;
 }
-复制代码
 ```
 
 这样子，就可以使用二叉树这个自建的数据结构了:
 
-```
+```javascript
 var bst = new BST()；
 bst.insert(10);
 bst.insert(8);
 bst.insert(2);
 bst.insert(7);
 bst.insert(5);
-复制代码
-复制代码
 ```
 
 但是这个时候，想要看树中的数据，不是那么清晰，所以接下来，就要用到遍历了。
@@ -2016,7 +1973,7 @@ bst.insert(5);
 
 
 
-```
+```javascript
 function preOrder(node) {
     if(node !== null) {
         //根节点->左子树->右子树
@@ -2025,7 +1982,6 @@ function preOrder(node) {
         preOrder(node.right);
     }
 }
-复制代码
 ```
 
 **中序遍历:**
@@ -2038,7 +1994,7 @@ function preOrder(node) {
 
 
 
-```
+```javascript
 function inOrder(node) {
     if(node !== null) {
         //如果不是null，就一直查找左变，因此递归
@@ -2050,7 +2006,6 @@ function inOrder(node) {
         inOrder(node.right);
     }
 }
-复制代码
 ```
 
 **后序遍历:**
@@ -2063,7 +2018,7 @@ function inOrder(node) {
 
 
 
-```
+```javascript
 function postOrder(node) {
     if(node !== null) {
         //左子树->右子树->根节点
@@ -2072,7 +2027,6 @@ function postOrder(node) {
         console.log(node.show())
     }
 }
-复制代码
 ```
 
 #####二叉树的查找
@@ -2085,7 +2039,7 @@ function postOrder(node) {
 
 清楚思路后，就动手来写：
 
-```
+```javascript
 //最小值
 function getMin(bst) {
     var current = bst.root;
@@ -2103,12 +2057,11 @@ function getMax(bst) {
     }
     return current.data;
 }
-复制代码
 ```
 
 最大、最小值都是非常简单的，下面主要看下如何通过
 
-```
+```javascript
 function find(target,bst) {
     var current = bst.root;
     while(current !== null) {
@@ -2123,7 +2076,6 @@ function find(target,bst) {
     }
     return -1;
 }
-复制代码
 ```
 
 其实核心，仍然是通过一个循环和判断，来不断的向下去寻找，这里的思想其实和二分查找是有点类似的。
@@ -2292,7 +2244,7 @@ function queryClassName(node, name) {
 
   在写的时候需要足够理解二叉搜素树的特点，需要先设定好每个节点的数据结构
 
-```
+```javascript
 class Node {  
   constructor(data, left, right) {
     this.data = data;
@@ -2407,11 +2359,10 @@ module.exports = BinarySearchTree;
 
 最近，朋友T 在准备面试，他为一道编程题所困，向我求助。原题如下：
 
-```
+```javascript
 // 写一个 sum 方法，当使用下面的语法调用时，能正常工作
 console.log(sum(2, 3)); // Outputs 5
 console.log(sum(2)(3)); // Outputs 5
-复制代码
 ```
 
 这道题要考察的，就是对函数柯里化的理解。让我们先来解析一下题目的要求：
@@ -2421,7 +2372,7 @@ console.log(sum(2)(3)); // Outputs 5
 
 所以，sum 函数可以这样写：
 
-```
+```javascript
 function sum (x) {
     if (arguments.length == 2) {
         return arguments[0] + arguments[1];
@@ -2431,7 +2382,6 @@ function sum (x) {
         return x + y;
     }
 }
-复制代码
 ```
 
 arguments 的用法挺灵活的，在这里它则用于分割两种不同的情况。当参数只有一个的时候，进行柯里化的处理。
@@ -2446,12 +2396,11 @@ arguments 的用法挺灵活的，在这里它则用于分割两种不同的情�
 
 柯里化的定义，理解起来有点费劲。为了更好地理解，先看下面这个例子：
 
-```
+```javascript
 function sum (a, b, c) {
     console.log(a + b + c);
 }
 sum(1, 2, 3); // 6
-复制代码
 ```
 
 毫无疑问，sum 是个简单的累加函数，接受3个参数，输出累加的结果。
@@ -2470,7 +2419,7 @@ sum(1, 2, 3); // 6
 
 网上有一些不同的柯里化的实现方式，以下是个人觉得最容易理解的写法：
 
-```
+```javascript
 function curry (fn, currArgs) {
     return function() {
         let args = [].slice.call(arguments);
@@ -2489,7 +2438,6 @@ function curry (fn, currArgs) {
         return fn.apply(null, args);
     }
 }
-复制代码
 ```
 
 解析一下 curry 函数的写法：
@@ -2506,7 +2454,7 @@ function curry (fn, currArgs) {
 
 测试一下：
 
-```
+```javascript
 function sum(a, b, c) {
     console.log(a + b + c);
 }
@@ -2517,7 +2465,6 @@ fn(1, 2, 3); // 6
 fn(1, 2)(3); // 6
 fn(1)(2, 3); // 6
 fn(1)(2)(3); // 6
-复制代码
 ```
 
 都能输出 6 了，搞定！
@@ -2526,7 +2473,7 @@ fn(1)(2)(3); // 6
 
 理解了柯里化的实现之后，让我们来看一下它的实际应用。柯里化的目的是，减少代码冗余，以及增加代码的可读性。来看下面这个例子：
 
-```
+```javascript
 const persons = [
     { name: 'kevin', age: 4 },
     { name: 'bob', age: 5 }
@@ -2540,7 +2487,6 @@ const getProp = curry(function (obj, index) {
 
 const ages = persons.map(getProp('age')); // [4, 5]
 const names = persons.map(getProp('name')); // ['kevin', 'bob']
-复制代码
 ```
 
 在实际的业务中，我们常会遇到类似的列表数据。用 getProp 就可以很方便地，取出列表中某个 key 对应的值。
@@ -2549,7 +2495,7 @@ const names = persons.map(getProp('name')); // ['kevin', 'bob']
 
 为什么要这么写？关键就在于 `arguments` 的隐式传参。
 
-```
+```javascript
 const getProp = curry(function (obj, index) {
     console.log(arguments);
     // 会输出4个类数组，取其中一个来看
@@ -2563,31 +2509,28 @@ const getProp = curry(function (obj, index) {
     //     3: "age"
     // }
 });
-复制代码
 ```
 
 map 是 Array 的原生方法，它的用法如下：
 
-```
+```javascript
 var new_array = arr.map(function callback(currentValue[, index[, array]]) {
     // Return element for new_array
 }[, thisArg]);
-复制代码
 ```
 
 所以，我们传入的 `name`，就排在了 arguments 的最后。为了拿到 `name` 对应的值，需要对类数组 arguments 做点转换，让它可以使用 Array 的原生方法。所以，最终 getProp 方法定义成了这样：
 
-```
+```javascript
 const getProp = curry(function (obj, index) {
     const args = [].slice.call(arguments);
     return obj[args[args.length - 1]];
 });
-复制代码
 ```
 
 当然，还有另外一种写法，curry 的实现更好理解，但是调用的代码却变多了，大家可以根据实际情况进行取舍。
 
-```
+```javascript
 const getProp = curry(function (key, obj) {
     return obj[key];
 });
@@ -2598,12 +2541,11 @@ const ages = persons.map(item => {
 const names = persons.map(item => {
     return getProp(item)('name');
 });
-复制代码
 ```
 
 最后，来看一个 Memoization 的例子。它用于优化比较耗时的计算，通过将计算结果缓存到内存中，这样对于同样的输入值，下次只需要中内存中读取结果。
 
-```
+```javascript
 function memoizeFunction(func) {
     const cache = {};
     return function() {
@@ -2624,7 +2566,6 @@ const fibonacci = memoizeFunction(function(n) {
 
 console.log(fibonacci(100)); // 输出354224848179262000000
 console.log(fibonacci(100)); // 输出354224848179262000000
-复制代码
 ```
 
 代码中，第2次计算 fibonacci(100) 则只需要在内存中直接读取结果。
