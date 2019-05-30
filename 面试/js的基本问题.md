@@ -278,8 +278,6 @@ console.log(window.number);
 
 **题难不难？不难！继续挑战一下！难！知道难，就更要继续了！** 
 
-![img](data:image/svg+xml;utf8,<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="400" height="400"></svg>)
-
 
 
 ### 14. 什么是闭包？闭包的作用是什么？闭包有哪些使用场景？
@@ -451,10 +449,6 @@ new Object() 方式创建对象本质上是方法调用，涉及到在proto链�
 
 
 
-![img](data:image/svg+xml;utf8,<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="1280" height="617"></svg>)
-
-
-
 ------
 
 ### 19. prototype 和 `__proto__` 区别是什么？
@@ -542,9 +536,7 @@ function deepClone(obj) { //递归拷贝
 
 ------
 
-**看不下去了？别人的送分题会成为你的送命题** 
-
-![img](data:image/svg+xml;utf8,<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="422" height="366"></svg>)
+**看不下去了？别人的送分题会成为你的送命题**
 
 
 
@@ -703,10 +695,6 @@ HTML5标准规定了 setTimeout() 的第二个参数的最小值不得小于4毫
 下面是详细解释:
 
 JavaScript使用 Number 类型表示数字(整数和浮点数)，使用64位表示一个数字。
-
-
-
-![img](data:image/svg+xml;utf8,<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="1280" height="518"></svg>)
 
 
 
