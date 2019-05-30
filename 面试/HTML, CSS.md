@@ -100,7 +100,12 @@ box-sizing为CSS3属性，IE8+和其他现代浏览器支持。
    像inline一样放置(比如和它相邻的元素处在同一行)，像block一样表现。比如：input,select,img等。
 
 ```html
-<span>This is a span here<span style="display: inline-block; border: solid red 1px; height: 70px; ">This is a<br />inline-block<br />element</span> This is a span here.</span>
+<span>This is a span here
+    <span style="display: inline-block; border: solid red 1px; height: 70px; ">
+        This is a<br />inline-block<br />element
+    </span> 
+    This is a span here.
+</span>
 ```
 
 即:和内联元素在同一行，但自身相当于块级元素，可以设置width,height等属性。
@@ -371,7 +376,7 @@ position:relative和负margin都可以使元素位置发生偏移，（都不会
 
 这种方式是绝对定位居中，除了使用 `margin`，我们还可以使用 `transform`（注意浏览器兼容性，只适用于 ie9+，移动开发请忽略）
 
-```
+```css
         .container{
             width: 300px;
             height: 200px;
@@ -388,7 +393,7 @@ position:relative和负margin都可以使元素位置发生偏移，（都不会
             margin-left: -50px;
             background: #fff;
             text-align: center;
-        }复制代码
+        }
         .container{
             width: 300px;
             height: 200px;
@@ -404,7 +409,7 @@ position:relative和负margin都可以使元素位置发生偏移，（都不会
             transform: translate(-50%, -50%);
             background: #fff;
             text-align: center;
-        }复制代码
+        }
 ```
 
 或者使用 `magin:0 auto`；但一般情况下我都会使用上一种，因为习惯了(ಥ_ಥ)
@@ -413,7 +418,7 @@ position:relative和负margin都可以使元素位置发生偏移，（都不会
 
 将子元素设置为行内元素，然后父元素设置 `text-align: center`。
 
-```
+```css
         .container{
             width: 300px;
             height: 200px;
@@ -424,14 +429,14 @@ position:relative和负margin都可以使元素位置发生偏移，（都不会
         .inner{
             display: inline-block;
 
-        }复制代码
+        }
 ```
 
 ##### 多个块状元素
 
 上面的方式即使子元素不止一个也想实现水平居中也是有效的，（宽度固定不固定都可，不固定的话就不需要设置宽度，会被自动撑开，但是要考虑到撑爆的情况）例如：
 
-```
+```css
         .container{
             width: 250px;
             height: 200px;
@@ -447,7 +452,7 @@ position:relative和负margin都可以使元素位置发生偏移，（都不会
             margin: 0 auto;
             background: #fff;
             text-align: center;
-        }复制代码
+        }
 ```
 
 
@@ -458,7 +463,7 @@ position:relative和负margin都可以使元素位置发生偏移，（都不会
 
 当然也可以使用我们刚刚介绍的 flex，我们只需要让子元素在主轴上的对齐方式设置为居中就可以
 
-```
+```css
         .container{
             width: 250px;
             height: 200px;
@@ -472,7 +477,7 @@ position:relative和负margin都可以使元素位置发生偏移，（都不会
             width: 50px;
             height: 150px;
             margin-left: 10px;
-        }复制代码
+        }
 ```
 
 #### 垂直居中
@@ -481,7 +486,7 @@ position:relative和负margin都可以使元素位置发生偏移，（都不会
 
 单行海内元素居中，只需要将子元素的行高等于高度就可以了。
 
-```
+```css
         #container {
             height: 400px;
             background: pink;
@@ -490,14 +495,14 @@ position:relative和负margin都可以使元素位置发生偏移，（都不会
             display: inline-block;
             height: 200px;
             line-height: 200px;
-        }复制代码
+        }
 ```
 
 ##### 多行元素
 
 上面的这种方式只能处理单行的行内元素，对于多行的行内元素是处理不了的，因为给每一个子元素都设置了 `line-height`，看了很多方法，要不是没有效果，要不然就是又局限性，提到最多的是使用 `table-cell` 的方式（但是貌似这个方法也有一点弊端，那就是其子元素的表现形式和行内元素类似，子元素不能独占一行），**当然如果你有更好的方式，欢迎提出**：
 
-```
+```css
         .container {
             width: 200px;
             height: 400px;
@@ -510,19 +515,22 @@ position:relative和负margin都可以使元素位置发生偏移，（都不会
         .inner{
             display: table-cell;
             vertical-align:middle;
-        }复制代码
+        }
 ```
 
 还有一个方法是设置一个空的行内元素，使其 `height:100%`，`display:inline-block`,`vertical-align: middle;` 并且 `font-size:0`。但是这样方式的原理我还不是很清楚，只是知道要设置一个空元素，高度和父元素相等，并且设置垂直居中的属性。但是，这只是用与所有的行内元素的宽度和不超过父元素的宽度的情况。
 
-```
+```html
 <div class="container">
     <img src="WechatIMG110.jpg" width="50px" />
     <img src="WechatIMG110.jpg" width="50px" />
     <img src="WechatIMG110.jpg" width="50px" />
     <p>123</p>
-</div>复制代码
-        .container{
+</div>
+```
+
+```css
+.container{
             width: 400px;
             height: 100px;
             background: pink;
@@ -539,7 +547,7 @@ position:relative和负margin都可以使元素位置发生偏移，（都不会
             line-height: 100%;
             vertical-align: middle;
             font-size: 0;
-        }复制代码
+        }
 ```
 
 效果：
@@ -555,13 +563,16 @@ position:relative和负margin都可以使元素位置发生偏移，（都不会
 经常有看到设计稿是图片和文字垂直居中的，那么怎么才能让图片和文字垂直居中呢？
 只需要给图片一个 `vertical-align: middle;` 属性就可以：
 
-```
+```html
 <div class="container">
     <img src="WechatIMG110.jpg" height="260" />
     <p>123456</p>
 
-</div>复制代码
-        .container {
+</div>
+```
+
+```css
+.container {
             background: pink;
             padding: 20px;
             height: 400px;
@@ -575,7 +586,7 @@ position:relative和负margin都可以使元素位置发生偏移，（都不会
         .container p{
             display: inline-block;
 
-        }复制代码
+        }
 ```
 
 效果如下：
@@ -614,12 +625,12 @@ position:relative和负margin都可以使元素位置发生偏移，（都不会
 
 HTML 文件就很普通：
 
-```
+```html
 <div class="container">
     <div class="middle">测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试</div>
     <div class="left">left</div>
     <div class="right">right</div>
-</div>复制代码
+</div>
 ```
 
 **这里我们要注意的是，中间栏要在放在文档流前面以优先渲染。**
@@ -628,7 +639,7 @@ HTML 文件就很普通：
 
 然后我们写 CSS，我们现将其三个元素的宽度和高度设置好，然后都设置为 `float:left`:
 
-```
+```css
         .middle{
             width: 100%;
             background: paleturquoise;
@@ -650,7 +661,7 @@ HTML 文件就很普通：
             font-size: 40px;
             float: left;
             color: #fff;
-        }复制代码
+        }
 ```
 
 这时的效果如下：
@@ -691,7 +702,7 @@ HTML 文件就很普通：
 
 最终的 CSS 代码如下：
 
-```
+```css
         .container{
             padding: 0 200px;
         }
@@ -721,7 +732,7 @@ HTML 文件就很普通：
             color: #fff;
             margin-left:-200px;
 
-        }复制代码
+        }
 ```
 
 最终效果如下：
@@ -755,7 +766,7 @@ HTML 文件就很普通：
 
 所以只是一个小小的改动
 
-```
+```html
 <div class="container">
     <div class="middle-container">
         <div class="middle">测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试</div>
@@ -763,8 +774,11 @@ HTML 文件就很普通：
     </div>
     <div class="left">left</div>
     <div class="right">right</div>
-</div>复制代码
-        .middle-container{
+</div>
+```
+
+```css
+.middle-container{
             width: 100%;
             background: paleturquoise;
             height: 200px;
@@ -796,7 +810,7 @@ HTML 文件就很普通：
             color: #fff;
             margin-left:-200px;
 
-        }复制代码
+        }
 ```
 
 这样，在我们将中间元素宽度调到比两边元素小的时候，也是可以正常显示，但是如果总宽度小于左边元素或者右边元素的时候，还是会有问题。
@@ -955,7 +969,7 @@ text-align:center,vertical-align: middle;
 
 首先创建基本的HTML布局和最基本的样式。
 
-```
+```html
 <div class="wrapper" id="wrapper">
   <div class="left">
     左边固定宽度，高度不固定 </br> </br></br></br>高度有可能会很小，也可能很大。
@@ -969,7 +983,7 @@ text-align:center,vertical-align: middle;
 
 基本的样式是，两个盒子相距`20px`, 左侧盒子宽 `120px`，右侧盒子宽度自适应。基本的CSS样式如下:
 
-```
+```css
 .wrapper {
     padding: 15px 20px;
     border: 1px dashed #ff6c60;
@@ -988,7 +1002,7 @@ text-align:center,vertical-align: middle;
 
 ####双inline-block方案
 
-```
+```css
 .wrapper-inline-block {
     box-sizing: content-box;
     font-size: 0;    // 消除空格的影响
@@ -1019,7 +1033,7 @@ text-align:center,vertical-align: middle;
 
 ####双float方案
 
-```
+```css
 .wrapper-double-float {
     overflow: auto;        // 清除浮动
     box-sizing: content-box;
@@ -1048,7 +1062,7 @@ text-align:center,vertical-align: middle;
 
 ####float+margin-left方案
 
-```
+```css
 .wrapper-float {
     overflow: hidden;        // 清除浮动
 }
@@ -1075,7 +1089,7 @@ text-align:center,vertical-align: middle;
 
 另外一种让两个`block`排列到一起的方法是对左侧盒子使用`position: absolute`的绝对定位。这样，右侧盒子也能**无视**掉它。
 
-```
+```css
 .wrapper-absolute .left {
     position: absolute;
 }
@@ -1094,7 +1108,7 @@ text-align:center,vertical-align: middle;
 
 上面的方法都需要通过左侧盒子的宽度，计算某个值，下面三种方法都是不需要计算的。只需要设置两个盒子之间的间隔。
 
-```
+```css
 .wrapper-float-bfc {
     overflow: auto;
 }
@@ -1121,7 +1135,7 @@ text-align:center,vertical-align: middle;
 
 ####flex方案
 
-```
+```css
 .wrapper-flex {
     display: flex;
     align-items: flex-start;
@@ -1134,16 +1148,18 @@ text-align:center,vertical-align: middle;
 .wrapper-flex .right {
     flex: 1 1 auto;
 }
+
+```
+
 flex`可以说是最好的方案了，代码少，使用简单。有朝一日，大家都改用现代浏览器，就可以使用了。
 **需要注意**的是，`flex`容器的一个默认属性值:`align-items: stretch;`。这个属性导致了列等高的效果。
 为了让两个盒子高度自动，需要设置: `align-items: flex-start;
-```
 
 ####grid方案
 
 又一个新型的布局方式。可以满足需求，但这并不是它发挥用处的真正地方。
 
-```
+```css
 .wrapper-grid {
     display: grid;
     grid-template-columns: 120px 1fr;
