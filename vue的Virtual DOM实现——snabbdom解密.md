@@ -141,7 +141,7 @@ function sameVnode(vnode1, vnode2) {
 }
 ```
 
-patch方法里面实现了snabbdom作为一个搞笑virtual dom库的法宝——高效的diff算法，可以用一张图示意：
+patch方法里面实现了snabbdom作为一个高效virtual dom库的法宝——高效的diff算法，可以用一张图示意：
 
 ![virtual dom的diff算法](https://images2015.cnblogs.com/blog/572874/201705/572874-20170505153024476-62826483.png)
 
